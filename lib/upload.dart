@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:video_player/video_player.dart'; // <--- 1. เพิ่ม Import วิดีโอเพลเยอร์
+import 'package:video_player/video_player.dart';
 
 class UploadContent extends StatefulWidget {
   final bool isActive;
@@ -17,7 +17,7 @@ class _UploadContentState extends State<UploadContent> {
   bool _isPublicDomain = false;
 
   File? _selectedVideo;
-  VideoPlayerController? _videoPlayerController; // <--- 2. ตัวควบคุมวิดีโอ
+  VideoPlayerController? _videoPlayerController;
 
   final _videoTitleController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -43,7 +43,6 @@ class _UploadContentState extends State<UploadContent> {
     _originalWriterController.dispose();
     _instrumentController.dispose();
     
-    // <--- 3. คืนหน่วยความจำเมื่อปิดหน้านี้
     _videoPlayerController?.dispose(); 
     super.dispose();
   }
@@ -59,10 +58,8 @@ class _UploadContentState extends State<UploadContent> {
           _isFileSelected = true; 
         });
 
-        // <--- 4. โหลดวิดีโอเข้า Controller
         _videoPlayerController = VideoPlayerController.file(_selectedVideo!)
           ..initialize().then((_) {
-            // เมื่อโหลดวิดีโอเสร็จ ให้รีเฟรชหน้าจอเพื่อแสดงผล
             setState(() {});
             _videoPlayerController!.play(); // สั่งให้เล่นอัตโนมัติ
           });

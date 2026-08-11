@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_gate.dart';
-import 'login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ตั้งค่า Supabase
   await dotenv.load(fileName: ".env");
 
   await Supabase.initialize(
@@ -27,9 +25,8 @@ class MyApp extends StatelessWidget {
       title: 'Fuzik App',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        brightness: Brightness.dark, // ธีมมืดพื้นฐาน
+        brightness: Brightness.dark,
       ),
-      // จุดเริ่มต้นคือ AuthGate เสมอ
       home: const AuthGate(),
     );
   }

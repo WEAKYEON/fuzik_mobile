@@ -10,7 +10,6 @@ class CollaborationContent extends StatefulWidget {
 class _CollaborationContentState extends State<CollaborationContent> {
   @override
   Widget build(BuildContext context) {
-    // 1. เช็กความกว้างจอ: ถ้ามือถือเล็ก (< 600) ให้โชว์แค่ 1-2 คอลัมน์
     double screenWidth = MediaQuery.of(context).size.width;
     int columns = screenWidth < 400 ? 1 : (screenWidth < 800 ? 2 : 4);
     double padding = screenWidth < 600 ? 16.0 : 40.0;
@@ -58,7 +57,6 @@ class _CollaborationContentState extends State<CollaborationContent> {
     );
   }
 
-  // ปรับให้ Text ในช่องเล็กลงเวลาแสดงผลบนจอเล็ก
   Widget _buildBox(String text) {
     return Container(
       decoration: BoxDecoration(border: Border.all(color: Colors.black, width: 1.5)), 

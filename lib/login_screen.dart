@@ -21,9 +21,37 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const MainLayout()));
+      if (mounted) {
+        Navigator.pushReplacement(
+            context, MaterialPageRoute(builder: (context) => const MainLayout()));
+      }
+    } on AuthException catch (e) {
+      String errorMessage = 'Something went wrong. Please try again.';
+      
+      if (e.message == 'Invalid login credentials') {
+        errorMessage = 'Invalid email or password.';
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage, style: const TextStyle(color: Colors.white)),
+            backgroundColor: Colors.redAccent, 
+            behavior: SnackBarBehavior.floating, 
+          ),    
+        );
+      }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      // 3. ดัก Error ทั่วไปอื่นๆ (เช่น อินเทอร์เน็ตหลุด)
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('An error occurred: ${e.toString()}'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating, // เพิ่มให้กล่องลอยสวยๆ เหมือนกัน
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -41,7 +69,6 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         child: Stack(
           children: [
-            // 1. หัวข้อ FUZIK มุมซ้ายบน
             const Positioned(
               top: 50, left: 24,
               child: Text('FUZIK', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 2, color: Colors.black)),
@@ -88,9 +115,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildInput(TextEditingController controller, String hint, {bool obscure = false}) => TextField(
   controller: controller,
   obscureText: obscure,
-  // 🌟 เพิ่ม cursorColor เพื่อให้รู้ว่ากำลังพิมพ์อยู่
   cursorColor: Colors.black, 
-  // 🌟 เน้นสไตล์ตัวอักษรให้ชัดเจน
   style: const TextStyle(
     color: Colors.black87, 
     fontSize: 16,
@@ -105,7 +130,6 @@ class _LoginScreenState extends State<LoginScreen> {
       borderRadius: BorderRadius.circular(8),
       borderSide: BorderSide.none,
     ),
-    // เพิ่ม contentPadding ให้ตัวหนังสือไม่อยู่ชิดขอบเกินไป
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
   ),
 );
