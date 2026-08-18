@@ -1,33 +1,38 @@
 # FUZIK Collaboration Application
 
-แอปพลิเคชันสำหรับการจัดการไฟล์งานและการ Collaboration ของทีม Fuzik พัฒนาด้วย Flutter และเชื่อมต่อกับ Supabase สำหรับการจัดการ Backend แบบ Real-time
+A collaboration and file management application designed for the Fuzik team. Built with Flutter and integrated with Supabase for real-time backend management.
 
 ## Features
-- **Secure Authentication:** ระบบ Login ที่ปลอดภัยด้วย Supabase Auth
-- **File Management:** อัปโหลดและจัดการไฟล์งานผ่าน Inventory
-- **Real-time Collaboration:** เชื่อมต่อและแชร์งานกับเพื่อนร่วมทีมได้ทันที
-- **Responsive UI:** รองรับการใช้งานทั้งบนมือถือและแท็บเล็ต
+- **Secure Authentication:** Secure login system powered by Supabase Auth.
+- **File Management:** Upload, organize, and manage project files via the Inventory system.
+- **Real-time Collaboration:** Instantly connect and share work with team members.
+- **Responsive UI:** Optimized for both mobile and tablet devices.
 
 ## Technology Stack
 - **Frontend:** Flutter
 - **Backend:** Supabase (Auth, Storage, Database)
-- **State Management:** SetState & IndexedStack
+- **State Management:** `setState` & `IndexedStack`
 
 ## Getting Started
 
 ### Prerequisites
-- Flutter SDK (version 3.x.x ขึ้นไป)
-- ติดตั้ง Dependencies: `flutter pub get`
+- Flutter SDK (version 3.x.x or higher)
+- Install dependencies by running:
+   ```env
+   flutter pub get
+   ```
 
 ### Configuration
-1. สร้างไฟล์ `.env` ไว้ในโฟลเดอร์หลักของโปรเจกต์
-2. เพิ่มค่าตัวแปรดังนี้:
+1. Create a .env file in the root directory of the project.
+2. Add your Supabase credentials:
    ```env
    SUPABASE_URL=YOUR_SUPABASE_URL
    SUPABASE_ANON_KEY=YOUR_SUPABASE_KEY
    ```
+(Note: Do not commit the .env file to version control. It should be added to your .gitignore.)
 
-### รันโปรเจกต์:
+### Running the Project
+To run the application, execute the following command:
 ```Bash
 flutter run
 ```
