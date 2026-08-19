@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'main_layout.dart';
+import 'signup.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -93,7 +94,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       _buildInput(_passwordController, 'Enter Password...', obscure: true),
                       const SizedBox(height: 12),
                       Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () {}, child: const Text('Forgot Password?', style: TextStyle(color: Color(0xFFD68910))))),
-                      Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () {}, child: const Text('Sign up', style: TextStyle(color: Color(0xFFD68910))))),
+                      Align(alignment: Alignment.centerRight, child: TextButton(onPressed: (){
+                        Navigator.push(context, MaterialPageRoute(builder: (context) => const SignupPage()));
+  }, child: const Text('Sign up', style: TextStyle(color: Color(0xFFD68910))))),
                       const SizedBox(height: 24),
                       ElevatedButton(
                         onPressed: _isLoading ? null : _signIn,
