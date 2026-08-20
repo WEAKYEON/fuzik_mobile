@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dart:ui';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -13,6 +13,8 @@ class _SignupPageState extends State<SignupPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+
+  bool _isLoading = false;
 
   bool get _isPasswordMismatch {
     final password = _passwordController.text;
@@ -44,6 +46,53 @@ class _SignupPageState extends State<SignupPage> {
     setState(() {});
   }
 
+  // 3. ฟังก์ชัน Backend สำหรับสมัคสมาชิก
+  Future<void> _signUp() async {
+    setState(() => _isLoading = true);
+
+    try {
+      await Supabase.instance.client.auth.signUp(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+        // เก็บ Username แนบไปกับข้อมูลผู้ใช้ของ Supabase ด้วย
+        data: {'username': _usernameController.text.trim()}, 
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Registration Success! You can now login.'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('An error occurred: ${e.toString()}'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -54,6 +103,15 @@ class _SignupPageState extends State<SignupPage> {
             child: Image.asset(
               'assets/images/background_login.jpg',
               fit: BoxFit.cover,
+            ),
+          ),
+
+          Positioned(
+            top: 50,
+            left: 16,
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white, size: 30),
+              onPressed: () => Navigator.pop(context),
             ),
           ),
 
@@ -68,7 +126,6 @@ class _SignupPageState extends State<SignupPage> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
-                  
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -81,41 +138,32 @@ class _SignupPageState extends State<SignupPage> {
                         color: Colors.black87,
                       ),
                     ),
-
                     const SizedBox(height: 32),
-
                     _buildLabel('Username'),
                     _buildInput(
                       _usernameController,
                       'Enter your username',
                     ),
-
                     const SizedBox(height: 20),
-
                     _buildLabel('Email'),
                     _buildInput(
                       _emailController,
                       'Enter your email',
                     ),
-
                     const SizedBox(height: 20),
-
                     _buildLabel('Password'),
                     _buildInput(
                       _passwordController,
                       'Enter your password',
                       obscure: true,
                     ),
-
                     const SizedBox(height: 24),
-
                     _buildLabel('Confirm Password'),
                     _buildInput(
                       _confirmPasswordController,
                       'Confirm your password',
                       obscure: true,
                     ),
-
                     if (_isPasswordMismatch)
                       const Padding(
                         padding: EdgeInsets.only(top: 8),
@@ -127,47 +175,47 @@ class _SignupPageState extends State<SignupPage> {
                           ),
                         ),
                       ),
-
                     const SizedBox(height: 24),
-
                     Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(8),
                         boxShadow: _isFormValid
-                          ? [
-                              BoxShadow(
-                                color: const Color(0xFFFFD600).withValues(alpha:0.6),
-                                blurRadius: 20,
-                                spreadRadius: 2,
-                              ),
-                            ]
-                          : [],
-                        
+                            ? [
+                                BoxShadow(
+                                  color: const Color(0xFFFFD600)
+                                      .withValues(alpha: 0.6),
+                                  blurRadius: 20,
+                                  spreadRadius: 2,
+                                ),
+                              ]
+                            : [],
                       ),
                       child: ElevatedButton(
-                        onPressed: _isFormValid
-                            ? () {
-                                // Signup logic goes here
-                              }
-                            : null,
+                        onPressed: (_isFormValid && !_isLoading) ? _signUp : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFFFD600),
-                              padding: const EdgeInsets.symmetric(
-      horizontal: 32,
-      vertical: 14,
-    ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 32,
+                            vertical: 14,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        child: const Text(
-                          'Sign Up',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
+                        child: _isLoading 
+                          ? const SizedBox(
+                              height: 20, 
+                              width: 20, 
+                              child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2)
+                            )
+                          : const Text(
+                              'Sign Up',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
                       ),
                     ),
                   ],

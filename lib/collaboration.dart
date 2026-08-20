@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class CollaborationContent extends StatefulWidget {
   const CollaborationContent({super.key});
@@ -8,6 +10,29 @@ class CollaborationContent extends StatefulWidget {
 }
 
 class _CollaborationContentState extends State<CollaborationContent> {
+  late Future<List<dynamic>> _layoutsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _layoutsFuture = fetchLayouts();
+  }
+
+  Future<List<dynamic>> fetchLayouts() async {
+    try {
+      final response = await http.get(Uri.parse('https://engine01.fuzikapp.com/layouts?q=a'));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data; 
+      } else {
+        throw Exception('Failed to load layouts');
+      }
+    } catch (e) {
+      throw Exception('Error connecting to server: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
@@ -19,82 +44,75 @@ class _CollaborationContentState extends State<CollaborationContent> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Select Collaboration Layout', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+          const Text(
+            'Select Collaboration Layout',
+            style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 8),
-          Text('Choose a template to merge your videos together.', style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14)),
+          Text(
+            'Choose a template to merge your videos together.',
+            style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14),
+          ),
           const SizedBox(height: 32),
+          
           Expanded(
-            child: GridView.count(
-              crossAxisCount: columns, // เปลี่ยนจาก 4 เป็นตัวแปรที่คำนวณไว้
-              crossAxisSpacing: 16, 
-              mainAxisSpacing: 16, 
-              childAspectRatio: 1.5,
-              children: [
-                _buildLayoutCard(_buildLayout1()),
-                _buildLayoutCard(_buildLayout2()),
-                _buildLayoutCard(_buildLayout3()),
-                _buildLayoutCard(_buildLayout4()),
-                _buildLayoutCard(_buildLayout5()),
-                _buildLayoutCard(_buildLayout6()),
-                _buildLayoutCard(_buildLayout7()),
-                _buildLayoutCard(_buildLayout8()),
-              ],
+            child: FutureBuilder<List<dynamic>>(
+              future: _layoutsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator(color: Color(0xFFFFD600)));
+                } else if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.red)));
+                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Center(child: Text('No layouts found', style: TextStyle(color: Colors.white)));
+                }
+
+                final layoutsList = snapshot.data!;
+
+                return GridView.builder(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    childAspectRatio: 1.5,
+                  ),
+                  itemCount: layoutsList.length,
+                  itemBuilder: (context, index) {
+                    final layoutData = layoutsList[index];
+                    
+                    final String imagePath = layoutData['layout_file_location'];
+                    final String imageUrl = 'https://media04.tetraserver.com/$imagePath';
+                    final String layoutName = layoutData['layout_name'];
+
+                    return InkWell(
+                      onTap: () {
+                        print('Selected Layout: $layoutName'); 
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(8.0),
+                        decoration: BoxDecoration(
+                          color: Colors.white, 
+                          borderRadius: BorderRadius.circular(8)
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: Image.network(
+                            imageUrl,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Center(child: Icon(Icons.broken_image, color: Colors.grey, size: 40));
+                            },
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
             ),
           ),
         ],
       ),
     );
-  }
-
-  Widget _buildLayoutCard(Widget layoutDesign) {
-    return InkWell(
-      onTap: () {},
-      child: Container(
-        padding: const EdgeInsets.all(8.0), 
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)), 
-        child: layoutDesign
-      ),
-    );
-  }
-
-  Widget _buildBox(String text) {
-    return Container(
-      decoration: BoxDecoration(border: Border.all(color: Colors.black, width: 1.5)), 
-      child: Center(
-        child: Text(text, style: const TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.bold))
-      )
-    );
-  }
-
-  Widget _buildLayout1() {
-    return Column(children: [Expanded(child: Row(children: [Expanded(child: _buildBox('1')), Expanded(child: _buildBox('2'))])), Expanded(child: Row(children: [Expanded(child: _buildBox('3')), Expanded(child: _buildBox('4'))]))]);
-  }
-
-  Widget _buildLayout2() {
-    return Row(children: [Expanded(child: _buildBox('1')), Expanded(child: _buildBox('2')), Expanded(child: _buildBox('3'))]);
-  }
-
-  Widget _buildLayout3() {
-    return Column(children: [Expanded(flex: 3, child: Row(children: [Expanded(child: _buildBox('1')), Expanded(child: _buildBox('2'))])), Expanded(flex: 2, child: Row(children: [const Spacer(flex: 1), Expanded(flex: 2, child: _buildBox('3')), const Spacer(flex: 1)]))]);
-  }
-
-  Widget _buildLayout4() {
-    return Row(children: [Expanded(child: _buildBox('1')), Expanded(child: Column(children: [Expanded(child: _buildBox('2')), Expanded(child: _buildBox('3'))]))]);
-  }
-
-  Widget _buildLayout5() {
-    return Padding(padding: const EdgeInsets.symmetric(horizontal: 16.0), child: Row(children: [Expanded(child: _buildBox('1')), const SizedBox(width: 8), Expanded(child: _buildBox('2'))]));
-  }
-
-  Widget _buildLayout6() {
-    return Padding(padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 32.0), child: Column(children: [Expanded(child: _buildBox('1')), const SizedBox(height: 8), Expanded(child: _buildBox('2'))]));
-  }
-
-  Widget _buildLayout7() {
-    return Padding(padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 8.0), child: Row(children: [Expanded(child: _buildBox('1')), const SizedBox(width: 8), Expanded(child: _buildBox('2'))]));
-  }
-
-  Widget _buildLayout8() {
-    return Row(children: [Expanded(flex: 2, child: _buildBox('1')), Expanded(flex: 3, child: Padding(padding: const EdgeInsets.only(left: 8.0, top: 16.0, bottom: 16.0, right: 16.0), child: _buildBox('2')))]);
   }
 }
