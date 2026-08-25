@@ -5,6 +5,8 @@ import 'upload.dart';
 import 'inventory.dart';
 import 'collaboration.dart';
 import 'login_screen.dart';
+import 'edit_profile.dart';
+import 'change_password.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -125,25 +127,95 @@ class _MainLayoutState extends State<MainLayout> {
         ),
       ),
       onSelected: (value) async {
+        if (value == 'profile'){
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context)=> const EditProfileScreen(),
+            ),
+          );
+        }
+
+        if (value == 'settings'){
+          Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context)=> const ChangePasswordScreen(),
+              ),
+          );
+        }
+
         if (value == 'logout') {
           await Supabase.instance.client.auth.signOut();
           if (mounted) {
             Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(builder: (context) => const LoginScreen()),
-              (route) => false, 
+              (route) => false,
             );
           }
         }
       },
       itemBuilder: (context) => [
         const PopupMenuItem(
+          value: 'profile',
+          child: Row(
+            children: [
+              Icon(
+                Icons.person,
+                color: Colors.white,
+                size: 18,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Edit Profile',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const PopupMenuItem(
+          value: 'settings',
+          child: Row(
+            children: [
+              Icon(
+                Icons.settings,
+                color: Colors.white,
+                size: 18,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Settings',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const PopupMenuItem(
           value: 'logout',
           child: Row(
             children: [
-              Icon(Icons.logout, color: Colors.redAccent, size: 18),
+              Icon(
+                Icons.logout,
+                color: Colors.redAccent,
+                size: 18,
+              ),
               SizedBox(width: 8),
-              Text('Logout', style: TextStyle(color: Colors.redAccent, fontSize: 14)),
+              Text(
+                'Logout',
+                style: TextStyle(
+                  color: Colors.redAccent,
+                  fontSize: 14,
+                ),
+              ),
             ],
           ),
         ),
