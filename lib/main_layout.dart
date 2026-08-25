@@ -5,6 +5,8 @@ import 'upload.dart';
 import 'inventory.dart';
 import 'collaboration.dart';
 import 'login_screen.dart';
+import 'edit_profile.dart';
+import 'change_password.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -72,10 +74,10 @@ class _MainLayoutState extends State<MainLayout> {
       ),
 
       bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: const Color(0xFF121212), // สีพื้นหลังแถบล่าง (เทาเข้ม)
-        type: BottomNavigationBarType.fixed, // แสดงเมนูครบทุกอัน
-        selectedItemColor: const Color(0xFFFFD600), // สีเหลืองเมื่อถูกเลือก
-        unselectedItemColor: Colors.white54, // สีเทาเมื่อไม่ได้เลือก
+        backgroundColor: const Color(0xFF121212),
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: const Color(0xFFFFD600),
+        unselectedItemColor: Colors.white54,
         currentIndex: _selectedIndex,
         onTap: (index) => setState(() => _selectedIndex = index),
         items: const [
@@ -101,8 +103,8 @@ class _MainLayoutState extends State<MainLayout> {
 
   Widget _buildProfileMenu(bool isMobile) {
     return PopupMenuButton<String>(
-      offset: const Offset(0, 45), // ปรับตำแหน่งกล่องเมนูให้เลื่อนลงมาไม่บังปุ่ม
-      color: const Color(0xFF1E1E1E), // สีพื้นหลังกล่องเมนู
+      offset: const Offset(0, 45),
+      color: const Color(0xFF1E1E1E),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
@@ -125,25 +127,95 @@ class _MainLayoutState extends State<MainLayout> {
         ),
       ),
       onSelected: (value) async {
+        if (value == 'profile'){
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context)=> const EditProfileScreen(),
+            ),
+          );
+        }
+
+        if (value == 'settings'){
+          Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context)=> const ChangePasswordScreen(),
+              ),
+          );
+        }
+
         if (value == 'logout') {
           await Supabase.instance.client.auth.signOut();
           if (mounted) {
             Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(builder: (context) => const LoginScreen()),
-              (route) => false, 
+              (route) => false,
             );
           }
         }
       },
       itemBuilder: (context) => [
         const PopupMenuItem(
+          value: 'profile',
+          child: Row(
+            children: [
+              Icon(
+                Icons.person,
+                color: Colors.white,
+                size: 18,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Edit Profile',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const PopupMenuItem(
+          value: 'settings',
+          child: Row(
+            children: [
+              Icon(
+                Icons.settings,
+                color: Colors.white,
+                size: 18,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Settings',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const PopupMenuItem(
           value: 'logout',
           child: Row(
             children: [
-              Icon(Icons.logout, color: Colors.redAccent, size: 18),
+              Icon(
+                Icons.logout,
+                color: Colors.redAccent,
+                size: 18,
+              ),
               SizedBox(width: 8),
-              Text('Logout', style: TextStyle(color: Colors.redAccent, fontSize: 14)),
+              Text(
+                'Logout',
+                style: TextStyle(
+                  color: Colors.redAccent,
+                  fontSize: 14,
+                ),
+              ),
             ],
           ),
         ),

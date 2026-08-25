@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'choose_video.dart';
 
 class CollaborationContent extends StatefulWidget {
-  const CollaborationContent({super.key});
+  final bool showBackButton; 
+
+  const CollaborationContent({super.key, this.showBackButton = false});
 
   @override
   State<CollaborationContent> createState() => _CollaborationContentState();
@@ -39,7 +42,7 @@ class _CollaborationContentState extends State<CollaborationContent> {
     int columns = screenWidth < 400 ? 1 : (screenWidth < 800 ? 2 : 4);
     double padding = screenWidth < 600 ? 16.0 : 40.0;
 
-    return Padding(
+    Widget content = Padding(
       padding: EdgeInsets.all(padding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -86,7 +89,13 @@ class _CollaborationContentState extends State<CollaborationContent> {
 
                     return InkWell(
                       onTap: () {
-                        print('Selected Layout: $layoutName'); 
+                        print('You are viewing $layoutName');
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ChooseVideoScreen(layoutData: layoutData),
+                          ),
+                        );
                       },
                       child: Container(
                         padding: const EdgeInsets.all(8.0),
@@ -114,5 +123,22 @@ class _CollaborationContentState extends State<CollaborationContent> {
         ],
       ),
     );
+
+    if (widget.showBackButton) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: content,
+      );
+    }
+
+    return content;
   }
 }

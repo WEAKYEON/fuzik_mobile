@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -9,36 +11,49 @@ class SignupPage extends StatefulWidget {
 }
 
 class _SignupPageState extends State<SignupPage> {
-  final _usernameController = TextEditingController();
+  // 🟢 เพิ่ม Controller สำหรับรับค่าตามหน้าเว็บ
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _usernameController = TextEditingController(); // Display name
+  final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _genreController = TextEditingController();
+  final _instrumentController = TextEditingController();
 
   bool _isLoading = false;
+  bool _acceptTerms = false; // Checkbox ยอมรับเงื่อนไข
 
   bool get _isPasswordMismatch {
     final password = _passwordController.text;
     final confirmPassword = _confirmPasswordController.text;
-
     return password.isNotEmpty &&
         confirmPassword.isNotEmpty &&
         password != confirmPassword;
   }
 
+  // 🟢 บังคับว่าต้องกรอกข้อมูลที่จำเป็นให้ครบ และติ๊กถูก
   bool get _isFormValid {
     return _usernameController.text.trim().isNotEmpty &&
         _emailController.text.trim().isNotEmpty &&
         _passwordController.text.isNotEmpty &&
         _confirmPasswordController.text.isNotEmpty &&
-        !_isPasswordMismatch;
+        !_isPasswordMismatch &&
+        _acceptTerms; 
   }
 
   @override
   void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _usernameController.dispose();
+    _phoneController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _genreController.dispose();
+    _instrumentController.dispose();
     super.dispose();
   }
 
@@ -46,17 +61,42 @@ class _SignupPageState extends State<SignupPage> {
     setState(() {});
   }
 
-  // 3. ฟังก์ชัน Backend สำหรับสมัคสมาชิก
   Future<void> _signUp() async {
     setState(() => _isLoading = true);
 
     try {
-      await Supabase.instance.client.auth.signUp(
+      final AuthResponse res = await Supabase.instance.client.auth.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
-        // เก็บ Username แนบไปกับข้อมูลผู้ใช้ของ Supabase ด้วย
         data: {'username': _usernameController.text.trim()}, 
       );
+
+      if (res.user != null) {
+        try {
+          // ดึงค่าทั้งหมดมาเตรียมไว้
+          final String firstName = _firstNameController.text.trim();
+          final String lastName = _lastNameController.text.trim();
+          final String displayName = _usernameController.text.trim();
+          final String phone = _phoneController.text.trim();
+          final String email = _emailController.text.trim();
+          final String genre = _genreController.text.trim();
+          final String instrument = _instrumentController.text.trim();
+
+          final Uri url = Uri.parse(
+            'https://engine01.fuzikapp.com/create_musician2?display_name=$displayName&email=$email&first_name=$firstName&last_name=$lastName&genre=$genre&instrument=$instrument&tel=$phone'
+          );
+
+          final response = await http.get(url);
+
+          if (response.statusCode == 200 || response.statusCode == 201) {
+            print('สร้างโปรไฟล์ใน Engine01 สำเร็จ');
+          } else {
+            print('เซฟลง Engine01 ไม่ผ่าน: ${response.statusCode} - ${response.body}');
+          }
+        } catch (e) {
+          print('ยิง API ไป Engine01 ไม่สำเร็จ: $e');
+        }
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -66,7 +106,7 @@ class _SignupPageState extends State<SignupPage> {
             behavior: SnackBarBehavior.floating,
           ),
         );
-        Navigator.pop(context);
+        Navigator.pop(context); 
       }
     } on AuthException catch (e) {
       if (mounted) {
@@ -118,11 +158,11 @@ class _SignupPageState extends State<SignupPage> {
           // Signup form
           Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 80),
               child: Container(
                 padding: const EdgeInsets.all(32),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.7),
+                  color: Colors.white.withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
@@ -130,92 +170,124 @@ class _SignupPageState extends State<SignupPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const Text(
-                      'Create Account',
-                      textAlign: TextAlign.center,
+                      'Register',
+                      textAlign: TextAlign.left,
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: 28,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                        color: Colors.black,
                       ),
                     ),
-                    const SizedBox(height: 32),
-                    _buildLabel('Username'),
-                    _buildInput(
-                      _usernameController,
-                      'Enter your username',
-                    ),
-                    const SizedBox(height: 20),
-                    _buildLabel('Email'),
-                    _buildInput(
-                      _emailController,
-                      'Enter your email',
-                    ),
-                    const SizedBox(height: 20),
-                    _buildLabel('Password'),
-                    _buildInput(
-                      _passwordController,
-                      'Enter your password',
-                      obscure: true,
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Create your account. It\'s free and only take a minute',
+                      style: TextStyle(color: Colors.black87, fontSize: 14),
                     ),
                     const SizedBox(height: 24),
-                    _buildLabel('Confirm Password'),
-                    _buildInput(
-                      _confirmPasswordController,
-                      'Confirm your password',
-                      obscure: true,
+                    
+                    Row(
+                      children: [
+                        Expanded(child: _buildInput(_firstNameController, 'Firstname')),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildInput(_lastNameController, 'Lastname')),
+                      ],
                     ),
+                    const SizedBox(height: 16),
+                    _buildInput(_usernameController, 'Display name'),
+                    const SizedBox(height: 16),
+                    _buildInput(_phoneController, 'Telephone', inputType: TextInputType.phone),
+                    const SizedBox(height: 16),
+                    _buildInput(_emailController, 'Email', inputType: TextInputType.emailAddress),
+                    const SizedBox(height: 16),
+                    _buildInput(_passwordController, 'Password', obscure: true),
+                    const SizedBox(height: 16),
+                    _buildInput(_confirmPasswordController, 'Confirm Password', obscure: true),
                     if (_isPasswordMismatch)
                       const Padding(
                         padding: EdgeInsets.only(top: 8),
                         child: Text(
                           'Passwords do not match',
-                          style: TextStyle(
-                            color: Colors.red,
-                            fontSize: 14,
-                          ),
+                          style: TextStyle(color: Colors.red, fontSize: 14),
                         ),
                       ),
-                    const SizedBox(height: 24),
-                    Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: _isFormValid
-                            ? [
-                                BoxShadow(
-                                  color: const Color(0xFFFFD600)
-                                      .withValues(alpha: 0.6),
-                                  blurRadius: 20,
-                                  spreadRadius: 2,
+                    const SizedBox(height: 16),
+                    _buildInput(_genreController, 'Music genre'),
+                    const SizedBox(height: 16),
+                    _buildInput(_instrumentController, 'Musical instruments'),
+                    
+                    const SizedBox(height: 16),
+                    
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: _acceptTerms,
+                          activeColor: const Color(0xFFFFD600),
+                          checkColor: Colors.black,
+                          onChanged: (value) {
+                            setState(() {
+                              _acceptTerms = value ?? false;
+                            });
+                          },
+                        ),
+                        Expanded(
+                          child: RichText(
+                            text: const TextSpan(
+                              style: TextStyle(color: Colors.black, fontSize: 14),
+                              children: [
+                                TextSpan(text: 'I accept the '),
+                                TextSpan(
+                                  text: 'Terms of Use',
+                                  style: TextStyle(color: Color(0xFFB8860B), fontWeight: FontWeight.bold), // สีเหลืองทอง
                                 ),
-                              ]
-                            : [],
-                      ),
+                                TextSpan(text: ' & '),
+                                TextSpan(
+                                  text: 'Privacy Policy',
+                                  style: TextStyle(color: Color(0xFFB8860B), fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 24),
+                    
+                    SizedBox(
+                      height: 50,
                       child: ElevatedButton(
                         onPressed: (_isFormValid && !_isLoading) ? _signUp : null,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFFD600),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 32,
-                            vertical: 14,
-                          ),
+                          backgroundColor: const Color(0xFF6C757D), // สีเทาเหมือนเว็บ
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(4),
                           ),
                         ),
                         child: _isLoading 
                           ? const SizedBox(
                               height: 20, 
                               width: 20, 
-                              child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2)
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
                             )
                           : const Text(
-                              'Sign Up',
+                              'Register Now',
                               style: TextStyle(
-                                color: Colors.black,
+                                color: Colors.white,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
                               ),
                             ),
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 20),
+                    Center(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text(
+                          'Already has an account? Login',
+                          style: TextStyle(color: Colors.black, fontSize: 15),
+                        ),
                       ),
                     ),
                   ],
@@ -228,50 +300,37 @@ class _SignupPageState extends State<SignupPage> {
     );
   }
 
-  Widget _buildLabel(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
-          color: Colors.black87,
-        ),
-      ),
-    );
-  }
-
   Widget _buildInput(
     TextEditingController controller,
     String hint, {
     bool obscure = false,
+    TextInputType inputType = TextInputType.text,
   }) {
     return TextField(
       controller: controller,
       obscureText: obscure,
+      keyboardType: inputType,
       onChanged: _onFieldChanged,
       cursorColor: Colors.black,
-      style: const TextStyle(
-        color: Colors.black87,
-        fontSize: 16,
-        fontWeight: FontWeight.w500,
-      ),
+      style: const TextStyle(color: Colors.black87, fontSize: 16),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(
-          color: Colors.grey,
-          fontSize: 16,
-        ),
+        hintStyle: const TextStyle(color: Colors.grey, fontSize: 15),
         filled: true,
-        fillColor: const Color(0xFFF4F7FC),
+        fillColor: Colors.white, // พื้นหลังช่องกรอกสีขาว
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(4), // ขอบเหลี่ยมๆ เหมือนเว็บ
+          borderSide: const BorderSide(color: Colors.grey),
         ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(4),
+          borderSide: BorderSide(color: Colors.grey.shade400),
         ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(4),
+          borderSide: const BorderSide(color: Color(0xFF6C757D), width: 1.5),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
     );
   }

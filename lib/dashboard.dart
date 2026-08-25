@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'view_play.dart';
+import 'jam_watch.dart'; 
 
 class DashboardContent extends StatefulWidget {
   const DashboardContent({super.key});
@@ -34,11 +36,9 @@ class _DashboardContentState extends State<DashboardContent> {
 
   @override
   Widget build(BuildContext context) {
-    // เช็กความกว้างหน้าจอเพื่อจัด Layout ให้เหมาะกับมือถือ หรือแท็บเล็ต
     double screenWidth = MediaQuery.of(context).size.width;
     double paddingHorizontal = screenWidth < 600 ? 16.0 : 40.0;
     
-    // คำนวณจำนวนคอลัมน์อัตโนมัติ (ถ้าน้อยกว่า 400 เอา 1 คอลัมน์, น้อยกว่า 600 เอา 2, นอกนั้น 4)
     int columns = screenWidth < 400 ? 1 : (screenWidth < 600 ? 2 : 4);
 
     return SingleChildScrollView(
@@ -148,17 +148,46 @@ class _DashboardContentState extends State<DashboardContent> {
               return GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                // ใช้ตัวแปร columns ที่คำนวณไว้ด้านบนมาใส่ตรงนี้
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: columns, 
-                  crossAxisSpacing: 16, // ลดระยะห่างลงนิดหน่อยให้เหมาะกับมือถือ
+                  crossAxisSpacing: 16, 
                   mainAxisSpacing: 24, 
-                  childAspectRatio: columns == 1 ? 1.5 : 1.0, // ถ้ามือถือจอเล็กมีคอลัมน์เดียว ปรับการ์ดให้เป็นแนวนอนกว้างๆ
+                  childAspectRatio: columns == 1 ? 1.5 : 1.0, 
                 ),
                 itemCount: videos.length,
                 itemBuilder: (context, index) {
                   final video = videos[index];
-                  return _buildVideoCard(video['title']?.toString() ?? '', video['artist']?.toString() ?? '', '${video['views'] ?? 0} views');
+                  final title = video['title']?.toString() ?? '';
+                  final artist = video['artist']?.toString() ?? '';
+                  final views = '${video['views'] ?? 0} views';
+
+                  return _buildVideoCard(
+                    title,
+                    artist,
+                    views,
+                    isSolo: isSoloSelected,
+                    onTap: () {
+                      if (isSoloSelected) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ViewPlayScreen(
+                              title: title,
+                              artist: artist,
+                              views: views,
+                            ),
+                          ),
+                        );
+                      } else {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const JamWatchScreen(),
+                          ),
+                        );
+                      }
+                    },
+                  );
                 },
               );
             },
@@ -168,36 +197,106 @@ class _DashboardContentState extends State<DashboardContent> {
     );
   }
 
-  Widget _buildVideoCard(String title, String artist, String views) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFFFD600).withOpacity(0.4), width: 1),
-            ),
-            child: Stack(
-              children: [
-                const Center(child: Icon(Icons.play_circle_fill, color: Colors.white30, size: 48)),
-                Positioned(bottom: 8, left: 8, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), color: Colors.black87, child: const Text('JAM', style: TextStyle(color: Colors.white, fontSize: 10)))),
-              ],
+  Widget _buildVideoCard(
+      String title,
+      String artist,
+      String views, {
+        required bool isSolo,
+        VoidCallback? onTap,
+      }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: const Color(0xFFFFD600).withValues(alpha: 0.4),
+                  width: 1,
+                ),
+              ),
+              child: Stack(
+                children: [
+                  const Center(
+                    child: Icon(
+                      Icons.play_circle_fill,
+                      color: Colors.white30,
+                      size: 48,
+                    ),
+                  ),
+
+                  Positioned(
+                    bottom: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      color: isSolo ? Colors.blueGrey[900] : Colors.black87,
+                      child: Text(
+                        isSolo ? 'SOLO' : 'JAM',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            const Icon(Icons.music_note, color: Colors.white, size: 16),
-            const SizedBox(width: 4),
-            Expanded(child: Text(title, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold))),
-          ],
-        ),
-        const SizedBox(height: 2),
-        Padding(padding: const EdgeInsets.only(left: 20.0), child: Text(artist, style: const TextStyle(color: Colors.white60, fontSize: 12))),
-        Padding(padding: const EdgeInsets.only(left: 20.0), child: Text(views, style: const TextStyle(color: Colors.white38, fontSize: 11))),
-      ],
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(
+                Icons.music_note,
+                color: Colors.white,
+                size: 16,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  title,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Padding(
+            padding: const EdgeInsets.only(left: 20),
+            child: Text(
+              artist,
+              style: const TextStyle(
+                color: Colors.white60,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 20),
+            child: Text(
+              views,
+              style: const TextStyle(
+                color: Colors.white38,
+                fontSize: 11,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
