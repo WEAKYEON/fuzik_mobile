@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'choose_video.dart';
 
 class CollaborationContent extends StatefulWidget {
   const CollaborationContent({super.key});
@@ -86,8 +87,14 @@ class _CollaborationContentState extends State<CollaborationContent> {
 
                     return InkWell(
                       onTap: () {
-                        print('Selected Layout: $layoutName'); 
-                      },
+                        print('You are viewing $layoutName');
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ChooseVideoScreen(layoutData: layoutData),
+                          ),
+                        );
+                                              },
                       child: Container(
                         padding: const EdgeInsets.all(8.0),
                         decoration: BoxDecoration(
