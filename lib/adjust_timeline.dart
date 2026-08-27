@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'choose_video.dart';
+import 'choose_video2.dart';
 
 class AdjustTimelineScreen extends StatefulWidget {
   final String layoutName;
-  final Map<int, SampleVideo?> selectedVideos;
+  final List<SampleVideo> selectedVideos;
 
   const AdjustTimelineScreen({
     super.key,

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'choose_video.dart';
+import 'choose_video2.dart';
 
 class CollaborationContent extends StatefulWidget {
   final bool showBackButton; 
@@ -84,16 +84,18 @@ class _CollaborationContentState extends State<CollaborationContent> {
                     final layoutData = layoutsList[index];
                     
                     final String imagePath = layoutData['layout_file_location'];
-                    final String imageUrl = 'https://media04.tetraserver.com/$imagePath';
+                    final String imageUrl = 'https://media05.fuzikapp.com/$imagePath';
                     final String layoutName = layoutData['layout_name'];
 
                     return InkWell(
                       onTap: () {
                         print('You are viewing $layoutName');
+                        print("This is the layout data: $layoutData");
+                        print("Layout: $layoutsList");
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => ChooseVideoScreen(layoutData: layoutData),
+                            builder: (context) => ChooseVideo2(layoutData: layoutData),
                           ),
                         );
                       },
