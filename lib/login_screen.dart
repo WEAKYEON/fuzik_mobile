@@ -90,172 +90,179 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/background_login.jpg',
-              fit: BoxFit.cover,
+      body: LayoutBuilder(
+        builder: (BuildContext context,BoxConstraints constraints){
+          final isTablet = constraints.maxWidth >=600;
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: Image.asset(
+                'assets/images/background_login.jpg',
+                fit: BoxFit.cover,
+              ),
             ),
-          ),
-
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Container(
-                padding: const EdgeInsets.all(32),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.7),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      'Fuzik Collaboration Login',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-
-                    const SizedBox(height: 32),
-
-                    _buildLabel('Email'),
-                    _buildInput(
-                      _emailController,
-                      'Enter your email',
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    _buildLabel('Password'),
-                    _buildInput(
-                      _passwordController,
-                      'Enter your password',
-                      obscure: true,
-                    ),
-
-                    const SizedBox(height: 4),
-
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                              const ForgotPassword(),
-                            ),
-                          );
-                        },
-                        child: const Text(
-                          'Forgot Password?',
-                          style: TextStyle(
-                            color: Color(0xFFD68910),
-                            fontWeight: FontWeight.bold,
-                          ),
+        
+            Center(
+              child: SingleChildScrollView(
+                padding:  EdgeInsets.symmetric(
+                  horizontal:isTablet?120:24,
+                  ),
+                child: Container(
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'Fuzik Collaboration Login',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
                         ),
                       ),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    // Login button
-                    Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: _isFormValid && !_isLoading
-                            ? [
-                          BoxShadow(
-                            color: const Color(0xFFFFD600)
-                                .withValues(alpha: 0.6),
-                            blurRadius: 20,
-                            spreadRadius: 2,
-                          ),
-                        ]
-                            : [],
+        
+                      const SizedBox(height: 32),
+        
+                      _buildLabel('Email'),
+                      _buildInput(
+                        _emailController,
+                        'Enter your email',
                       ),
-                      child: ElevatedButton(
-                        onPressed:
-                        _isFormValid && !_isLoading ? _signIn : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFFD600),
-                          disabledBackgroundColor:
-                          Colors.grey.shade400,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 32,
-                            vertical: 14,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: _isLoading
-                            ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            color: Colors.black,
-                            strokeWidth: 2,
-                          ),
-                        )
-                            : const Text(
-                          'Login',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
+        
+                      const SizedBox(height: 20),
+        
+                      _buildLabel('Password'),
+                      _buildInput(
+                        _passwordController,
+                        'Enter your password',
+                        obscure: true,
                       ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // Sign Up link
-                    Center(
-                      child: RichText(
-                        text: TextSpan(
-                          style: const TextStyle(
-                            color: Colors.black87,
-                            fontSize: 14,
-                          ),
-                          children: [
-                            const TextSpan(
-                              text: "Don't have an account? ",
-                            ),
-                            TextSpan(
-                              text: 'Sign Up',
-                              style: const TextStyle(
-                                color: Color(0xFFD68910),
-                                fontWeight: FontWeight.bold,
-                                decoration: TextDecoration.underline,
+        
+                      const SizedBox(height: 4),
+        
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                const ForgotPassword(),
                               ),
-                              recognizer: TapGestureRecognizer()
-                                ..onTap = () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => SignupPage(),
-                                    ),
-                                  );
-                                },
+                            );
+                          },
+                          child: const Text(
+                            'Forgot Password?',
+                            style: TextStyle(
+                              color: Color(0xFFD68910),
+                              fontWeight: FontWeight.bold,
                             ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+        
+                      const SizedBox(height: 8),
+        
+                      // Login button
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: _isFormValid && !_isLoading
+                              ? [
+                            BoxShadow(
+                              color: const Color(0xFFFFD600)
+                                  .withValues(alpha: 0.6),
+                              blurRadius: 20,
+                              spreadRadius: 2,
+                            ),
+                          ]
+                              : [],
+                        ),
+                        child: ElevatedButton(
+                          onPressed:
+                          _isFormValid && !_isLoading ? _signIn : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFFD600),
+                            disabledBackgroundColor:
+                            Colors.grey.shade400,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 32,
+                              vertical: 14,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              color: Colors.black,
+                              strokeWidth: 2,
+                            ),
+                          )
+                              : const Text(
+                            'Login',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+        
+                      const SizedBox(height: 12),
+        
+                      // Sign Up link
+                      Center(
+                        child: RichText(
+                          text: TextSpan(
+                            style: const TextStyle(
+                              color: Colors.black87,
+                              fontSize: 14,
+                            ),
+                            children: [
+                              const TextSpan(
+                                text: "Don't have an account? ",
+                              ),
+                              TextSpan(
+                                text: 'Sign Up',
+                                style: const TextStyle(
+                                  color: Color(0xFFD68910),
+                                  fontWeight: FontWeight.bold,
+                                  decoration: TextDecoration.underline,
+                                ),
+                                recognizer: TapGestureRecognizer()
+                                  ..onTap = () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => SignupPage(),
+                                      ),
+                                    );
+                                  },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        );
+        }
       ),
     );
   }

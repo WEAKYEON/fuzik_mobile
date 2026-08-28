@@ -35,7 +35,12 @@ class _WalletState extends State<Wallet> {
         toolbarHeight: 60,
         backgroundColor: const Color.fromARGB(255, 21, 21, 21),
         foregroundColor: Colors.white,
-        leading: const Icon(Icons.arrow_back_ios_new_rounded,color:Colors.yellow),
+        leading: IconButton( 
+          icon:const Icon(Icons.arrow_back_ios_new_rounded,color:Colors.yellow),
+          onPressed: (){
+            Navigator.pop(context);
+          },
+          ),
         title: Row(
           children: [
              Image.asset(
@@ -48,7 +53,7 @@ class _WalletState extends State<Wallet> {
             Row(
               children: [
                 Image.asset(
-                  'assets/images/preminum_coin.png',
+                  'assets/images/premium_coin.png',
                   width: 20,
                   height: 20,
                   fit: BoxFit.cover,

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'view_play.dart';
 import 'jam_watch.dart'; 
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+//import 'package:cached_network_image/cached_network_image.dart'; //later to be add in dependencies
 
 class DashboardContent extends StatefulWidget {
   const DashboardContent({super.key});
@@ -10,20 +13,32 @@ class DashboardContent extends StatefulWidget {
 }
 
 class _DashboardContentState extends State<DashboardContent> {
-  bool isSoloSelected = false; 
+  bool isSoloSelected = true; 
   final _searchController = TextEditingController();
 
   Future<List<Map<String, dynamic>>> _fetchVideos() async {
     try {
-      await Future.delayed(const Duration(seconds: 1)); 
-      return List.generate(8, (index) => {
-        'id': index.toString(),
-        'title': 'Sample Jamming ${index + 1}',
-        'artist': 'Fuzik User',
-        'views': (index + 1) * 15,
-        'date': '1 month ago',
-      });
+      // await Future.delayed(const Duration(seconds: 1)); 
+      // return List.generate(8, (index) => {
+      //   'id': index.toString(),
+      //   'title': 'Sample Jamming ${index + 1}',
+      //   'artist': 'Fuzik User',
+      //   'views': (index + 1) * 15,
+      //   'date': '1 month ago',
+      // });
+      final url=Uri.parse('https://engine01.fuzikapp.com/play2s_l/');
+      final response= await http.get(url);
+        if (response.statusCode == 200) {
+        // jsonDecode parses the raw string into a Dart Map or List
+          final data = List<Map<String, dynamic>>.from(jsonDecode(response.body),);
+          
+          return data;
+        } else {
+          
+          throw Exception('Failed to load data');
+        } 
     } catch (e) {
+      print(e);
       return [];
     }
   }
@@ -39,7 +54,7 @@ class _DashboardContentState extends State<DashboardContent> {
     double screenWidth = MediaQuery.of(context).size.width;
     double paddingHorizontal = screenWidth < 600 ? 16.0 : 40.0;
     
-    int columns = screenWidth < 400 ? 1 : (screenWidth < 600 ? 2 : 4);
+    int columns = screenWidth < 400 ? 1 : (screenWidth < 600 ? 2 : 3);
 
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(horizontal: paddingHorizontal, vertical: 20),
@@ -157,14 +172,17 @@ class _DashboardContentState extends State<DashboardContent> {
                 itemCount: videos.length,
                 itemBuilder: (context, index) {
                   final video = videos[index];
-                  final title = video['title']?.toString() ?? '';
-                  final artist = video['artist']?.toString() ?? '';
+
+                  final title = video['video_title']?.toString() ?? '';
+                  final artist = video['musician_name']?.toString() ?? '';
                   final views = '${video['views'] ?? 0} views';
+                  final preview = video['preview']?.toString()??'';
 
                   return _buildVideoCard(
                     title,
                     artist,
                     views,
+                    preview,
                     isSolo: isSoloSelected,
                     onTap: () {
                       if (isSoloSelected) {
@@ -200,7 +218,8 @@ class _DashboardContentState extends State<DashboardContent> {
   Widget _buildVideoCard(
       String title,
       String artist,
-      String views, {
+      String views,
+      String preview, {
         required bool isSolo,
         VoidCallback? onTap,
       }) {
@@ -211,6 +230,7 @@ class _DashboardContentState extends State<DashboardContent> {
         children: [
           Expanded(
             child: Container(
+              clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(8),
@@ -221,13 +241,21 @@ class _DashboardContentState extends State<DashboardContent> {
               ),
               child: Stack(
                 children: [
-                  const Center(
-                    child: Icon(
-                      Icons.play_circle_fill,
-                      color: Colors.white30,
-                      size: 48,
-                    ),
-                  ),
+                   Image.network(
+                     preview,
+                     fit:BoxFit.cover,
+                     width: double.infinity,
+                     height: double.infinity,
+                     loadingBuilder: (context, child, loadingProgress) {
+                       if (loadingProgress == null) {
+                         // Image has finished loading
+                         return child;
+                       }
+                   
+                       return const Center(
+                         child: CircularProgressIndicator(),
+                       );
+                     },),
 
                   Positioned(
                     bottom: 8,
