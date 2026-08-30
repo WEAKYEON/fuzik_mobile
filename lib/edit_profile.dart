@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -9,6 +15,8 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
+  static const String baseUrl = 'https://engine01.fuzikapp.com';
+
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _displayNameController = TextEditingController();
@@ -17,20 +25,134 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _genreController = TextEditingController();
 
   bool _isFormValid = false;
+  bool _isLoading = false;
+
+  File? _selectedImage;
 
   @override
   void initState() {
     super.initState();
+    _loadProfile();
+  }
+  Future<void> _loadProfile() async {
+    final user = Supabase.instance.client.auth.currentUser;
 
-    // just Mockup
-    _firstNameController.text = '';
-    _lastNameController.text = '';
-    _displayNameController.text = '';
-    _phoneController.text = '';
-    _instrumentController.text = '';
-    _genreController.text = '';
+    if (user == null || user.email == null) {
+      return;
+    }
 
-    _updateFormValidity();
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/musician2_detail'
+              '?email=${Uri.encodeComponent(user.email!)}',
+        ),
+      );
+
+      print('Profile status: ${response.statusCode}');
+      print('Profile response: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data is List && data.isNotEmpty) {
+          final profile = data[0];
+
+          setState(() {
+            _firstNameController.text =
+                profile['first_name']?.toString() ?? '';
+
+            _lastNameController.text =
+                profile['last_name']?.toString() ?? '';
+
+            _displayNameController.text =
+                profile['display_name']?.toString() ?? '';
+
+            _phoneController.text =
+                profile['tel']?.toString() ?? '';
+
+            _instrumentController.text =
+                profile['music_inst']?.toString() ?? '';
+
+            _genreController.text =
+                profile['music_genre']?.toString() ?? '';
+          });
+
+          _updateFormValidity();
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Profile not found.'),
+              ),
+            );
+          }
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Failed to load profile. Status: ${response.statusCode}',
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('LOAD PROFILE ERROR: $e');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load profile: $e'),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<bool> _updateField(String field, String value) async {
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (user == null || user.email == null) {
+      print('UPDATE ERROR: No logged-in user/email');
+      return false;
+    }
+
+    try {
+      final url = Uri.parse(
+        '$baseUrl/modify_musician2'
+            '?email=${Uri.encodeComponent(user.email!)}'
+            '&field=${Uri.encodeComponent(field)}'
+            '&new_value=${Uri.encodeComponent(value)}',
+      );
+
+      print('UPDATE URL: $url');
+
+      final response = await http.get(url);
+
+      print('UPDATE STATUS: ${response.statusCode}');
+      print('UPDATE RESPONSE: ${response.body}');
+
+      if (response.statusCode != 200) {
+        return false;
+      }
+
+      final data = jsonDecode(response.body);
+
+      if (data is List && data.isNotEmpty) {
+        print('UPDATE RESULT: ${data[0]['result']}');
+        print('UPDATE DESCRIPTION: ${data[0]['description']}');
+
+        return data[0]['result'] == 'Success';
+      }
+
+      return false;
+    } catch (e) {
+      print('UPDATE EXCEPTION: $e');
+      return false;
+    }
   }
 
   @override
@@ -56,21 +178,103 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     });
   }
 
-  void _saveChanges() {
+  Future<void> _saveChanges() async {
     if (!_isFormValid) return;
 
-    //  profile update logic goes here.
+    setState(() {
+      _isLoading = true;
+    });
+    final fields = {
+      'first_name': _firstNameController.text.trim(),
+      'last_name': _lastNameController.text.trim(),
+      'tel': _phoneController.text.trim(),
+      'music_inst': _instrumentController.text.trim(),
+      'music_genre': _genreController.text.trim(),
+    };
+
+    bool allSuccess = true;
+
+    for (final entry in fields.entries) {
+      final success = await _updateField(
+        entry.key,
+        entry.value,
+      );
+
+      if (!success) {
+        allSuccess = false;
+      }
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = false;
+    });
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+      SnackBar(
         content: Text(
-          'Profile changes saved.',
-          style: TextStyle(color: Colors.white),
+          allSuccess
+              ? 'Profile changes saved.'
+              : 'Failed to update profile.',
         ),
-        backgroundColor: Color(0xFF2E7D32),
+        backgroundColor:
+        allSuccess ? const Color(0xFF2E7D32) : Colors.redAccent,
         behavior: SnackBarBehavior.floating,
       ),
     );
+  }
+
+  Future<void> _pickProfileImage() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+      );
+
+      if (image != null) {
+        setState(() {
+          _selectedImage = File(image.path);
+        });
+      }
+    } catch (e) {
+      print('PROFILE IMAGE ERROR: $e');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to select image: $e'),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _takeProfilePhoto() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.camera,
+      );
+
+      if (image != null) {
+        setState(() {
+          _selectedImage = File(image.path);
+        });
+      }
+    } catch (e) {
+      print('CAMERA ERROR: $e');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to take photo: $e'),
+          ),
+        );
+      }
+    }
   }
 
   void _showProfilePictureOptions() {
@@ -115,16 +319,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
                   onTap: () {
                     Navigator.pop(context);
-
-                    // need to Open device camera.
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Camera will be connected later.',
-                        ),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
+                    _takeProfilePhoto();
                   },
                 ),
 
@@ -141,16 +336,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
                   onTap: () {
                     Navigator.pop(context);
-
-                    // need to Open device gallery.
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Gallery will be connected later.',
-                        ),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
+                    _pickProfileImage();
                   },
                 ),
 
@@ -168,15 +354,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   onTap: () {
                     Navigator.pop(context);
 
-                    // need to Remove profile pic from backend.
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Profile picture removed.',
-                        ),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
+                    setState(() {
+                      _selectedImage = null;
+                    });
                   },
                 ),
               ],
@@ -260,14 +440,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         onTap: _showProfilePictureOptions,
                         child: Stack(
                           children: [
-                            const CircleAvatar(
+                            CircleAvatar(
                               radius: 48,
                               backgroundColor: Colors.grey,
-                              child: Icon(
+                              backgroundImage: _selectedImage != null
+                                  ? FileImage(_selectedImage!)
+                                  : null,
+                              child: _selectedImage == null
+                                  ? const Icon(
                                 Icons.person,
                                 size: 52,
                                 color: Colors.white,
-                              ),
+                              )
+                                  : null,
                             ),
 
                             Positioned(
@@ -313,7 +498,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     _buildLabel('Display Name'),
                     _buildInput(
                       _displayNameController,
-                      'Enter your display name',
+                      'Display Name',
+                      readOnly: true,
                     ),
 
                     const SizedBox(height: 16),
@@ -350,7 +536,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(8),
-                        boxShadow: _isFormValid
+                        boxShadow: _isFormValid && !_isLoading
                             ? [
                           BoxShadow(
                             color: const Color(0xFFFFD600)
@@ -362,7 +548,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             : [],
                       ),
                       child: ElevatedButton(
-                        onPressed: _isFormValid ? _saveChanges : null,
+                        onPressed: _isFormValid && !_isLoading ? _saveChanges : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFFFD600),
                           disabledBackgroundColor:
@@ -375,7 +561,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        child: const Text(
+                        child: _isLoading
+                            ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.black,
+                          ),
+                        )
+                            : const Text(
                           'Save Changes',
                           style: TextStyle(
                             color: Colors.black,
@@ -413,9 +608,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       String hint, {
         TextInputType keyboardType = TextInputType.text,
         List<TextInputFormatter>? inputFormatters,
+        bool readOnly = false,
       }) {
     return TextField(
       controller: controller,
+      readOnly: readOnly,
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
       onChanged: (_) => _updateFormValidity(),
