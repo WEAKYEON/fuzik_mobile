@@ -210,7 +210,7 @@ class _UploadContentState extends State<UploadContent> {
                       _videoPlayerController!.value.isPlaying 
                           ? Icons.pause_circle_outline 
                           : Icons.play_circle_fill,
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withValues(alpha: 0.7),
                       size: 64,
                     ),
                   ),

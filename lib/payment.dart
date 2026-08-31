@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 
+import 'wallet_api.dart';
+
 class Payment extends StatefulWidget {
-  final String packageName;
-  final int coins;
-  final int price;
+  final WalletApi api;
+  final String email;
+  final CoinPack pack;
 
   const Payment({
     super.key,
-    required this.packageName,
-    required this.coins,
-    required this.price,
+    required this.api,
+    required this.email,
+    required this.pack,
   });
 
   @override
@@ -17,13 +19,32 @@ class Payment extends StatefulWidget {
 }
 
 class _PaymentState extends State<Payment> {
-  String _selectedPayment = 'Credit / debit card';
+  String _selectedPayment = 'card';
+  bool _submitting = false;
 
-  final List<String> _paymentMethods = [
-    'Credit / debit card',
-    'PromptPay',
-    'TrueMoney Wallet',
-  ];
+  final List<Map<String, String>> _paymentMethods = WalletApi.paymentMethods;
+
+  Future<void> _confirmPurchase() async {
+    setState(() => _submitting = true);
+    try {
+      await widget.api.purchaseCoinPackage(
+        email: widget.email,
+        packCode: widget.pack.code,
+        paymentMethod: _selectedPayment,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Purchase successful.')),
+      );
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +103,7 @@ class _PaymentState extends State<Payment> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            widget.packageName,
+                            widget.pack.name,
                             style: const TextStyle(
                               color: Colors.yellow,
                               fontSize: 24,
@@ -93,7 +114,7 @@ class _PaymentState extends State<Payment> {
                           const SizedBox(height: 8),
 
                           Text(
-                            '${widget.coins} coins',
+                            widget.pack.coinsLabel.toLowerCase(),
                             style: const TextStyle(
                               color: Colors.white70,
                               fontSize: 18,
@@ -104,7 +125,7 @@ class _PaymentState extends State<Payment> {
                     ),
 
                     Text(
-                      '฿${widget.price}',
+                      '฿${widget.pack.price}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 32,
@@ -130,9 +151,7 @@ class _PaymentState extends State<Payment> {
               const SizedBox(height: 20),
 
               // Payment methods
-              ..._paymentMethods.map(
-                (method) => _buildPaymentMethod(method),
-              ),
+              ..._paymentMethods.map(_buildPaymentMethod),
 
               const SizedBox(height: 28),
 
@@ -157,7 +176,7 @@ class _PaymentState extends State<Payment> {
                   ),
 
                   Text(
-                    '฿${widget.price} THB',
+                    '฿${widget.pack.price} THB',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 28,
@@ -174,24 +193,34 @@ class _PaymentState extends State<Payment> {
                 width: double.infinity,
                 height: 64,
                 child: ElevatedButton(
-                  onPressed: () {
-                    // Payment logic will go here
-                  },
+                  onPressed: _submitting ? null : _confirmPurchase,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.yellow,
                     foregroundColor: Colors.black,
+                    disabledBackgroundColor: Colors.yellow.withValues(
+                      alpha: 0.5,
+                    ),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(40),
                     ),
                   ),
-                  child: const Text(
-                    'Confirm Purchase',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child: _submitting
+                      ? const SizedBox(
+                          height: 26,
+                          width: 26,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            color: Colors.black,
+                          ),
+                        )
+                      : const Text(
+                          'Confirm Purchase',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
 
@@ -217,13 +246,15 @@ class _PaymentState extends State<Payment> {
     );
   }
 
-  Widget _buildPaymentMethod(String method) {
-    final bool isSelected = _selectedPayment == method;
+  Widget _buildPaymentMethod(Map<String, String> method) {
+    final String code = method['code']!;
+    final String label = method['label']!;
+    final bool isSelected = _selectedPayment == code;
 
     return GestureDetector(
       onTap: () {
         setState(() {
-          _selectedPayment = method;
+          _selectedPayment = code;
         });
       },
       child: Container(
@@ -264,7 +295,7 @@ class _PaymentState extends State<Payment> {
             const SizedBox(width: 28),
 
             Text(
-              method,
+              label,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 22,

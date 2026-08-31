@@ -32,7 +32,7 @@ class _InventoryContentState extends State<InventoryContent> {
         children: [
           const Text('Your Inventory', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          Text('Manage your uploaded videos and collaborations.', style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14)),
+          Text('Manage your uploaded videos and collaborations.', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14)),
           const SizedBox(height: 32),
           GridView.builder(
             shrinkWrap: true,
@@ -61,7 +61,7 @@ class _InventoryContentState extends State<InventoryContent> {
       children: [
         Expanded(
           child: Container(
-            decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFFFD600).withOpacity(0.4), width: 1)),
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFFFD600).withValues(alpha: 0.4), width: 1)),
             child: Stack(
               children: [
                 const Center(child: Icon(Icons.play_circle_fill, color: Colors.white30, size: 48)),

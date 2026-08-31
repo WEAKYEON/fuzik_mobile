@@ -175,8 +175,8 @@ class _DashboardContentState extends State<DashboardContent> {
         Expanded(
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFFFD600).withOpacity(0.4), width: 1),
+              color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFFFD600).withValues(alpha: 0.4), width: 1),
             ),
             child: Stack(
               children: [

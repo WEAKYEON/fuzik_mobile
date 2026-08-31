@@ -52,7 +52,7 @@ class _CollaborationContentState extends State<CollaborationContent> {
           const SizedBox(height: 8),
           Text(
             'Choose a template to merge your videos together.',
-            style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14),
           ),
           const SizedBox(height: 32),
           

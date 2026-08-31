@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dashboard.dart';
 import 'upload.dart';
 import 'inventory.dart';
 import 'collaboration.dart';
+import 'wallet.dart';
+import 'wallet_api.dart';
 import 'login_screen.dart';
 
 class MainLayout extends StatefulWidget {
@@ -14,18 +18,34 @@ class MainLayout extends StatefulWidget {
 }
 
 class _MainLayoutState extends State<MainLayout> {
-  int _selectedIndex = 0; 
+  int _selectedIndex = 0;
   String _displayName = 'User';
-  
+
+  final WalletApi _walletApi = WalletApi();
+  Timer? _balanceTimer;
+
   @override
   void initState() {
     super.initState();
     final user = Supabase.instance.client.auth.currentUser;
     if (user != null && user.email != null) {
-      _displayName = user.email!.split('@')[0].isNotEmpty 
-          ? user.email!.split('@')[0] 
+      _displayName = user.email!.split('@')[0].isNotEmpty
+          ? user.email!.split('@')[0]
           : 'Thanat';
     }
+
+    _walletApi.fetchSummary();
+    _balanceTimer = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _walletApi.fetchSummary(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _balanceTimer?.cancel();
+    _walletApi.dispose();
+    super.dispose();
   }
 
   @override
@@ -48,9 +68,26 @@ class _MainLayoutState extends State<MainLayout> {
           ),
         ),
         actions: [
-          _buildStatusBadge(isMobile ? 'PR' : 'PR waiting/∞', const Color(0xFF8AB4F8)),
-          const SizedBox(width: 8),
-          _buildStatusBadge(isMobile ? 'FZ' : 'FZ waiting/200', const Color(0xFFFFD600)),
+          ValueListenableBuilder<WalletSummary?>(
+            valueListenable: walletSummaryNotifier,
+            builder: (context, summary, _) {
+              final pr = summary?.paidBalance;
+              final fz = summary?.freeBalance;
+              return Row(
+                children: [
+                  _buildStatusBadge(
+                    'PR ${pr ?? '—'}/∞',
+                    const Color(0xFF8AB4F8),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildStatusBadge(
+                    'FZ ${fz ?? '—'}/200',
+                    const Color(0xFFFFD600),
+                  ),
+                ],
+              );
+            },
+          ),
           const SizedBox(width: 8),
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
@@ -67,6 +104,7 @@ class _MainLayoutState extends State<MainLayout> {
             UploadContent(isActive: _selectedIndex == 1),
             const InventoryContent(),
             const CollaborationContent(),
+            const Wallet(),
           ],
         ),
       ),
@@ -83,6 +121,7 @@ class _MainLayoutState extends State<MainLayout> {
           BottomNavigationBarItem(icon: Icon(Icons.upload), label: 'Upload'),
           BottomNavigationBarItem(icon: Icon(Icons.grid_view), label: 'Inventory'),
           BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Collab'),
+          BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet), label: 'Wallet'),
         ],
       ),
     );

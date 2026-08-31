@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'payment.dart';
 
+import 'payment.dart';
+import 'wallet_api.dart';
 
 class Wallet extends StatefulWidget {
   const Wallet({super.key});
@@ -10,186 +11,328 @@ class Wallet extends StatefulWidget {
 }
 
 class _WalletState extends State<Wallet> {
-  final packages = [
-  {
-    'name': 'Adagio Pack',
-    'price': 99,
-    'coins': 50,
-  },
-  {
-    'name': 'Allegro Pack',
-    'price': 199,
-    'coins': 120,
-  },
-  {
-    'name': 'Business',
-    'price': 399,
-    'coins': 300,
-  },
-];
+  static const Color _cardColor = Color(0xFF1B1B1B);
+
+  final WalletApi _api = WalletApi();
+  late Future<List<CoinPack>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  @override
+  void dispose() {
+    _api.dispose();
+    super.dispose();
+  }
+
+  Future<List<CoinPack>> _load() async {
+    final results = await Future.wait([_api.fetchSummary(), _api.fetchPacks()]);
+    return results[1] as List<CoinPack>;
+  }
+
+  Future<void> _refresh() async {
+    final future = _load();
+    setState(() => _future = future);
+    try {
+      await future;
+    } catch (_) {}
+  }
+
+  Future<void> _openCheckout(CoinPack pack) async {
+    final email = _api.currentEmail ?? '';
+
+    final purchased = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Payment(api: _api, email: email, pack: pack),
+      ),
+    );
+
+    if (purchased == true) {
+      await _refresh();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
-        toolbarHeight: 60,
-        backgroundColor: const Color.fromARGB(255, 21, 21, 21),
-        foregroundColor: Colors.white,
-        leading: const Icon(Icons.arrow_back_ios_new_rounded,color:Colors.yellow),
-        title: Row(
-          children: [
-             Image.asset(
-              'assets/images/FuzikLogo.png',
-              width: 35,
-              height: 35,
-              fit: BoxFit.cover,
-            ),
-            const Spacer(),
-            Row(
-              children: [
-                Image.asset(
-                  'assets/images/preminum_coin.png',
-                  width: 20,
-                  height: 20,
-                  fit: BoxFit.cover,
-              ),
-              Text("120",style:TextStyle(color:Colors.yellow,fontSize:15,fontWeight:FontWeight.bold)),
-              ],
-                  ),
-                  const SizedBox(width: 10),
-            Row(
-              children: [
-                Image.asset(
-                  'assets/images/fuzik_coin.png',
-                  width: 35,
-                  height: 35,
-                  fit: BoxFit.cover,
-              ),
-              Text("120",style:TextStyle(color:Colors.white,fontSize:15,fontWeight:FontWeight.bold)),
-              ],
-                  ),
-          ],
+      body: SafeArea(
+        child: RefreshIndicator(
+          color: Colors.yellow,
+          backgroundColor: _cardColor,
+          onRefresh: _refresh,
+          child: FutureBuilder<List<CoinPack>>(
+            future: _future,
+            builder: (context, snapshot) {
+              final packs = snapshot.data ?? WalletApi.defaultPacks;
+
+              return SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Wallet',
+                      style: TextStyle(
+                        color: Colors.yellow,
+                        fontSize: 34,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Manage your coins and buy more when you need them.',
+                      style: TextStyle(color: Colors.white70, fontSize: 15),
+                    ),
+                    const SizedBox(height: 28),
+
+                    _buildBalanceSection(),
+                    const SizedBox(height: 32),
+
+                    const Text(
+                      'Buy coins',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    ...packs.map(
+                      (pack) => Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: _buildPackageCard(
+                          pack: pack,
+                          onBuy: () => _openCheckout(pack),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ),
-      body: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
+    );
+  }
+
+  Widget _buildBalanceSection() {
+    return ValueListenableBuilder<WalletSummary?>(
+      valueListenable: walletSummaryNotifier,
+      builder: (context, summary, _) {
+        final freeAmount = summary?.freeBalance != null
+            ? '${summary!.freeBalance}'
+            : '—';
+        final paidAmount = summary?.paidBalance != null
+            ? '${summary!.paidBalance}'
+            : '—';
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _buildBalanceCard(
+                badge: 'FZ',
+                badgeColor: Colors.yellow,
+                badgeTextColor: Colors.black,
+                label: 'Free',
+                amount: freeAmount,
+                footer: 'Next coin in —',
+                footerColor: Colors.yellow,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildBalanceCard(
+                badge: 'PR',
+                badgeColor: const Color(0xFF1E3A8A),
+                badgeTextColor: Colors.white,
+                label: 'Paid',
+                amount: paidAmount,
+                footer: 'See packs ↓',
+                footerColor: const Color(0xFF60A5FA),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildBalanceCard({
+    required String badge,
+    required Color badgeColor,
+    required Color badgeTextColor,
+    required String label,
+    required String amount,
+    required String footer,
+    required Color footerColor,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _cardColor,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: badgeColor,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  badge,
+                  style: TextStyle(
+                    color: badgeTextColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                label,
+                style: const TextStyle(color: Colors.white54, fontSize: 15),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            amount,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 34,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(footer, style: TextStyle(color: footerColor, fontSize: 14)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPackageCard({
+    required CoinPack pack,
+    required VoidCallback onBuy,
+  }) {
+    final card = Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: pack.featured
+            ? Border.all(color: Colors.yellow, width: 2)
+            : null,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Buy Coins',
-                  style: TextStyle(
-                    color: Colors.white,
+                Text(
+                  pack.name,
+                  style: const TextStyle(
+                    color: Colors.yellow,
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-
-                const SizedBox(height: 20),
-
-                Center(
-                  child: Wrap(
-                  spacing: 12,
-                  runSpacing: 16,
-                  alignment: WrapAlignment.center,
-                  children: packages.map((package) {
-                    return SizedBox(
-                      width: 170,
-                      child: _buildPackageCard(
-                        context,
-                        package['name'] as String,
-                        package['price'] as int,
-                        package['coins'] as int,
-                      ),
-                    );
-                  }).toList(),
-                                ),
-                )
-              ],
-              ),
-),
-    );
-  }
-}
-
-Widget _buildPackageCard(
-  BuildContext context,
-  String name,
-  int price,
-  int coins,
-) {
-  return Card(
-    color: Colors.grey.shade900,
-    child: Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          Text(
-            name,
-            style: const TextStyle(
-              color: Colors.yellow,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          Text(
-            '$coins Coins',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          Text(
-            '$price THB',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          Container(
-            decoration:BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.yellow.withValues(alpha:0.3),
-                  spreadRadius: 0.3,
-                  blurRadius: 10,
-   
+                const SizedBox(height: 6),
+                Text(
+                  pack.coinsLabel,
+                  style: const TextStyle(color: Colors.white, fontSize: 15),
                 ),
               ],
             ),
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.yellow,
-                foregroundColor: Colors.black,
-              ),
-              onPressed: () {
-                // Buy package
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => Payment(
-                      packageName: name,
-                      price: price,
-                      coins: coins,
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              RichText(
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: '฿${pack.price}',
+                      style: const TextStyle(
+                        color: Colors.yellow,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
+                    const TextSpan(
+                      text: ' THB',
+                      style: TextStyle(color: Colors.white54, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: onBuy,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.yellow,
+                  foregroundColor: Colors.black,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                );
-              },
-              child: const Text('Buy'),
-            ),
+                ),
+                child: const Text(
+                  'Buy',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
           ),
         ],
       ),
-    ),
-  );
+    );
+
+    if (!pack.featured) return card;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Padding(padding: const EdgeInsets.only(top: 10), child: card),
+        Positioned(
+          left: 16,
+          top: 0,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.yellow,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Text(
+              'Best value',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }

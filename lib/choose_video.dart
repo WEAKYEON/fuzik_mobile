@@ -150,7 +150,7 @@ class _ChooseVideoScreen extends State<ChooseVideoScreen>{
   Widget build(BuildContext context) {
     final String layoutName = widget.layoutData['layout_name'];
     final definition = _getDefinitionForLayout(layoutName);
-    bool _isNextEnabled= _slotSelections.length == (definition?.slots.length );
+    bool isNextEnabled= _slotSelections.length == (definition?.slots.length );
     
     return Scaffold(
       appBar: AppBar(
@@ -342,7 +342,7 @@ class _ChooseVideoScreen extends State<ChooseVideoScreen>{
                   margin:const EdgeInsets.fromLTRB(0, 5, 0, 0),
                   decoration:BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
-                    boxShadow: _isNextEnabled ? [
+                    boxShadow: isNextEnabled ? [
                       BoxShadow(
                         color: Colors.yellow.withValues(alpha:0.3),
                         blurRadius: 5,
@@ -358,7 +358,7 @@ class _ChooseVideoScreen extends State<ChooseVideoScreen>{
                         borderRadius:BorderRadius.circular(8),
                       ),
                     ),
-                    onPressed:_isNextEnabled ?(){} : null,
+                    onPressed:isNextEnabled ?(){} : null,
                     
                     child:const Text('Next'),
                     
