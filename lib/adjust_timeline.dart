@@ -3,7 +3,7 @@ import 'choose_video2.dart';
 
 class AdjustTimelineScreen extends StatefulWidget {
   final String layoutName;
-  final List<SampleVideo> selectedVideos;
+  final List<Map<String,dynamic>> selectedVideos;
 
   const AdjustTimelineScreen({
     super.key,

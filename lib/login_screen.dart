@@ -105,7 +105,7 @@ class _LoginScreenState extends State<LoginScreen> {
             Center(
               child: SingleChildScrollView(
                 padding:  EdgeInsets.symmetric(
-                  horizontal:isTablet?120:24,
+                  horizontal:isTablet?140:24,
                   ),
                 child: Container(
                   padding: const EdgeInsets.all(32),

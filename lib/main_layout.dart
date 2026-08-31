@@ -70,6 +70,7 @@ class _MainLayoutState extends State<MainLayout> {
             UploadContent(isActive: _selectedIndex == 1),
             const InventoryContent(),
             const CollaborationContent(),
+            const Wallet()
           ],
         ),
       ),
@@ -86,6 +87,7 @@ class _MainLayoutState extends State<MainLayout> {
           BottomNavigationBarItem(icon: Icon(Icons.upload), label: 'Upload'),
           BottomNavigationBarItem(icon: Icon(Icons.grid_view), label: 'Inventory'),
           BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Collab'),
+          BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet_rounded), label: 'Wallet'),
         ],
       ),
     );

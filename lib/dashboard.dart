@@ -3,7 +3,7 @@ import 'view_play.dart';
 import 'jam_watch.dart'; 
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-//import 'package:cached_network_image/cached_network_image.dart'; //later to be add in dependencies
+import 'package:cached_network_image/cached_network_image.dart'; //This is a package to cache the images, t
 
 class DashboardContent extends StatefulWidget {
   const DashboardContent({super.key});
@@ -16,16 +16,23 @@ class _DashboardContentState extends State<DashboardContent> {
   bool isSoloSelected = true; 
   final _searchController = TextEditingController();
 
-  Future<List<Map<String, dynamic>>> _fetchVideos() async {
+  Future<List <Map<String, dynamic>>> _placeholderVideos() async{
+    try{
+      await Future.delayed(const Duration(seconds: 1)); 
+      return List.generate(8, (index) => {
+        'id': index.toString(),
+        'title': 'Sample Jamming ${index + 1}',
+        'artist': 'Fuzik User',
+        'views': (index + 1) * 15,
+        'date': '1 month ago',
+      });
+    }catch(e){
+      return [];
+    }
+  }
+  Future<List<Map<String, dynamic>>> _fetchLandscapeVideos() async {
     try {
-      // await Future.delayed(const Duration(seconds: 1)); 
-      // return List.generate(8, (index) => {
-      //   'id': index.toString(),
-      //   'title': 'Sample Jamming ${index + 1}',
-      //   'artist': 'Fuzik User',
-      //   'views': (index + 1) * 15,
-      //   'date': '1 month ago',
-      // });
+      
       final url=Uri.parse('https://engine01.fuzikapp.com/play2s_l/');
       final response= await http.get(url);
         if (response.statusCode == 200) {
@@ -151,7 +158,7 @@ class _DashboardContentState extends State<DashboardContent> {
           
           // ตารางวิดีโอ (GridView)
           FutureBuilder<List<dynamic>>(
-            future: _fetchVideos(),
+            future: isSoloSelected?_fetchLandscapeVideos():_placeholderVideos(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Color(0xFFFFD600))));
@@ -166,7 +173,7 @@ class _DashboardContentState extends State<DashboardContent> {
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: columns, 
                   crossAxisSpacing: 16, 
-                  mainAxisSpacing: 24, 
+                  mainAxisSpacing: 10, 
                   childAspectRatio: columns == 1 ? 1.5 : 1.0, 
                 ),
                 itemCount: videos.length,
@@ -228,7 +235,8 @@ class _DashboardContentState extends State<DashboardContent> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
+          AspectRatio(
+            aspectRatio: 16/9,
             child: Container(
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
@@ -241,21 +249,14 @@ class _DashboardContentState extends State<DashboardContent> {
               ),
               child: Stack(
                 children: [
-                   Image.network(
-                     preview,
-                     fit:BoxFit.cover,
-                     width: double.infinity,
-                     height: double.infinity,
-                     loadingBuilder: (context, child, loadingProgress) {
-                       if (loadingProgress == null) {
-                         // Image has finished loading
-                         return child;
-                       }
-                   
-                       return const Center(
-                         child: CircularProgressIndicator(),
-                       );
-                     },),
+                   CachedNetworkImage(
+                      imageUrl: preview,
+                      fit:BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
+                      placeholder: (context, url) => Center(child: CircularProgressIndicator(color:Colors.yellow)),
+                      errorWidget: (context, url, error) => Icon(Icons.error),
+                  ),
 
                   Positioned(
                     bottom: 8,

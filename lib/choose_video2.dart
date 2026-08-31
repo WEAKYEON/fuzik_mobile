@@ -1,23 +1,48 @@
 import 'package:flutter/material.dart';
 import 'adjust_timeline.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:flutter/cupertino.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 enum SlotOrientation { landscape, portrait }
-class SampleVideo {
-  final String id;
-  final String title;
-  final String thumbnailUrl;
-  final SlotOrientation orientation;
-  const SampleVideo({required this.id, required this.title, required this.thumbnailUrl, required this.orientation});
-}
 
-final List<SampleVideo> sampleVideos = List.generate(12, (i) {
-  return SampleVideo(
-    id: 'vid_$i',
-    title: 'Sample video $i',
-    thumbnailUrl: 'https://picsum.photos/seed/video$i/300/300',
-    orientation: SlotOrientation.portrait,
-  );
-});
+Future<List<Map<String, dynamic>>> _fetchLandscapeVideos() async {
+    try {     
+      final url=Uri.parse('https://engine01.fuzikapp.com/play2s_l/');
+      final response= await http.get(url);
+        if (response.statusCode == 200) {
+        // jsonDecode parses the raw string into a Dart Map or List
+          final data = List<Map<String, dynamic>>.from(jsonDecode(response.body),);         
+          return data;
+        } else {
+          
+          throw Exception('Failed to load data');
+        } 
+    } catch (e) {
+      print('There is an error while fetching the landscape videos: $e');
+      return [];
+    }
+  }
+
+Future<List<Map<String, dynamic>>> _fetchPortraitVideos() async {
+    try {     
+      final url=Uri.parse('https://engine01.fuzikapp.com/play2s_p/');
+      final response= await http.get(url);
+        if (response.statusCode == 200) {
+        // jsonDecode parses the raw string into a Dart Map or List
+          final data = List<Map<String, dynamic>>.from(jsonDecode(response.body),);         
+          return data;
+        } else {
+          
+          throw Exception('Failed to load data');
+        } 
+    } catch (e) {
+      print('There is an error while fetching the landscape videos: $e');
+      return [];
+    }
+  }
+
 class ChooseVideo2 extends StatefulWidget{
   const ChooseVideo2({super.key, required this.layoutData});
   final Map<String, dynamic> layoutData;
@@ -28,14 +53,18 @@ class ChooseVideo2 extends StatefulWidget{
 
 class _ChooseVideo2State extends State<ChooseVideo2>{
    final TextEditingController _searchController=TextEditingController();
-   List<SampleVideo> selectedVideos = [];
+   List<Map<String,dynamic>> selectedVideos = [];
+   SlotOrientation orientation=SlotOrientation.landscape;
+
   @override
   Widget build(BuildContext context){
-    print('Choose: ${widget.layoutData}');
+    //print('Chosen: ${widget.layoutData}');
     int totalVideo= widget.layoutData['l_videos_num'] + widget.layoutData['p_videos_num'];
     final imagePath = widget.layoutData['layout_file_location'];
     final imageUrl = 'https://media05.fuzikapp.com/$imagePath';
     final layoutName= widget.layoutData['layout_name'];
+
+    bool isLandscape= orientation==SlotOrientation.landscape ;
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.black,
@@ -114,8 +143,7 @@ class _ChooseVideo2State extends State<ChooseVideo2>{
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          
+                        children: [                         
                            Container(  // Search bar   
                               margin: const EdgeInsets.fromLTRB(0, 5, 0, 0),                 
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -138,7 +166,7 @@ class _ChooseVideo2State extends State<ChooseVideo2>{
                                 },
                               ),
                             ),
-                            SizedBox(
+                          SizedBox(
                               height: selectedVideos.isEmpty?0:115,
                               child: SingleChildScrollView(
                                 scrollDirection: Axis.horizontal,
@@ -158,7 +186,7 @@ class _ChooseVideo2State extends State<ChooseVideo2>{
                                                 border: BoxBorder.all(color:Colors.yellow,width: 1)
                                               ),
                                               child:Image.network(
-                                                video.thumbnailUrl,
+                                                video['preview'],
                                                 width: 100,
                                                 height: 100,
                                                 fit:BoxFit.cover,
@@ -196,48 +224,152 @@ class _ChooseVideo2State extends State<ChooseVideo2>{
                                 ),
                               ),
                             ),
-                          Expanded(
-                              child:
-                                GridView.builder(
-                                  controller: scrollController, 
-                                  padding: const EdgeInsets.all(12),
-                                  itemCount: sampleVideos.length,
-                                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 3,
-                                    mainAxisSpacing: 8,
-                                    crossAxisSpacing: 8,
-                                    childAspectRatio: 1, //later, to be adjusted according to the video
-                                  ),
-                                  itemBuilder: (context, index) {
-                                    final video = sampleVideos[index];
-                                    return GestureDetector(
-                                      onTap: (){
-                                        if(selectedVideos.length>=totalVideo){
-                                          ScaffoldMessenger.of(context).removeCurrentSnackBar();
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            
-                                            SnackBar(
-                                              content: Text(
-                                                'You can only select $totalVideo videos.',
-                                              ),
-                                              duration: const Duration(seconds: 2),
-                                              behavior: SnackBarBehavior.floating,
-                                              margin: const EdgeInsets.all(16),
-                                            ),
-                                          );
-                                          return;
-                                        }
-                                        setState(() {
-                                          selectedVideos.add(video);
-                                          });
-                                      },
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Image.network(video.thumbnailUrl, fit: BoxFit.cover),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                            child: CupertinoSlidingSegmentedControl<SlotOrientation>(
+                              groupValue: orientation,
+                              backgroundColor: Colors.black26,
+                              thumbColor: Colors.yellow,
+                              onValueChanged: (value) {
+                                if (value != null) {
+                                  setState(() {
+                                    orientation = value;
+                                    print(orientation);
+                                  });
+                                }
+                              },
+                              children: {
+                                SlotOrientation.landscape: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.crop_landscape_rounded,
+                                        size: 16,
+                                        color: orientation == SlotOrientation.landscape ? Colors.black : Colors.white,
                                       ),
-                                    );
-                                  },
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Landscape',
+                                        style: TextStyle(
+                                          color: orientation == SlotOrientation.landscape ? Colors.black : Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
+                                SlotOrientation.portrait: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.crop_portrait_rounded,
+                                        size: 16,
+                                        color: orientation == SlotOrientation.portrait ? Colors.black : Colors.white,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Portrait',
+                                        style: TextStyle(
+                                          color: orientation == SlotOrientation.portrait ? Colors.black : Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              },
+                            ),
+                          ),
+                          SizedBox(width:double.infinity, height: 20,) ,
+                          Expanded(
+                              child:                               
+                              FutureBuilder(
+                                                          
+                                future: isLandscape?_fetchLandscapeVideos():_fetchPortraitVideos(),
+                                builder: (context, snapshot) {
+                                if (snapshot.connectionState == ConnectionState.waiting) {
+                                  return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Color(0xFFFFD600))));
+                                }
+                                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                                  return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text('ไม่พบข้อมูลวิดีโอ', style: TextStyle(color: Colors.white54, fontSize: 16))));
+                                }
+                                final videos = snapshot.data!;
+                                return Padding(
+                                  padding: EdgeInsets.fromLTRB(5, 20, 5, 0),
+                                  child: GridView.builder(
+                                    controller: scrollController,
+                                    shrinkWrap: true,
+                                    //physics: const NeverScrollableScrollPhysics(),
+                                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 3, 
+                                      crossAxisSpacing: 10, 
+                                      mainAxisSpacing: 10, 
+                                      childAspectRatio: isLandscape?16/9:9/16, 
+                                    ),
+                                    itemCount: videos.length,
+                                    itemBuilder: (context, index) {
+                                      final video = videos[index];
+                                  
+                                      final preview = video['preview']?.toString()??'';
+                                  
+                                      return GestureDetector(
+                                        onTap: (){
+                                          
+                                          final alreadySelected = selectedVideos.any(
+                                            (selected) => selected['url'] == video['url'],
+                                          );
+
+                                          if (alreadySelected) {
+                                            ScaffoldMessenger.of(context).removeCurrentSnackBar();
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('This video is already selected'),
+                                                duration: Duration(seconds: 2),
+                                                behavior: SnackBarBehavior.floating,
+                                                margin: EdgeInsets.all(16),
+                                              ),
+                                            );
+                                            return;
+                                          }
+                                          if (selectedVideos.length >=totalVideo) {
+                                            ScaffoldMessenger.of(context).removeCurrentSnackBar();
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Maximum video reached'),
+                                                duration: Duration(seconds: 2),
+                                                behavior: SnackBarBehavior.floating,
+                                                margin: EdgeInsets.all(16),
+                                              ),
+                                            );
+                                            return;
+                                          }
+                                          setState(() {
+                                          
+                                            selectedVideos.add(video);
+                                            
+                                          });
+                                        },
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadiusGeometry.circular(5),
+                                          child: CachedNetworkImage(
+                                            imageUrl: preview,
+                                            fit:BoxFit.cover,
+                                            width: double.infinity,
+                                            height: double.infinity,
+                                            placeholder: (context, url) => Center(child: CircularProgressIndicator(color:Colors.yellow)),
+                                            errorWidget: (context, url, error) => Icon(Icons.error),
+                                                                            ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                );
+                              },
+                            ),
                           )
                               ],
                       
