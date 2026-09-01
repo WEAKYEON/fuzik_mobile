@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'view_play.dart';
-import 'jam_watch.dart'; 
+import 'jam_watch.dart';
+import 'package:http/http.dart' as http;
 
 class DashboardContent extends StatefulWidget {
   const DashboardContent({super.key});
@@ -10,20 +12,48 @@ class DashboardContent extends StatefulWidget {
 }
 
 class _DashboardContentState extends State<DashboardContent> {
-  bool isSoloSelected = false; 
+  bool isSoloSelected = false;
   final _searchController = TextEditingController();
+  String _searchQuery = '';
 
-  Future<List<Map<String, dynamic>>> _fetchVideos() async {
+
+  Future<List<Map<String, dynamic>>> _fetchVideos({
+    String query = '',
+  }) async {
     try {
-      await Future.delayed(const Duration(seconds: 1)); 
-      return List.generate(8, (index) => {
-        'id': index.toString(),
-        'title': 'Sample Jamming ${index + 1}',
-        'artist': 'Fuzik User',
-        'views': (index + 1) * 15,
-        'date': '1 month ago',
-      });
+      final encodedQuery = Uri.encodeComponent(query);
+
+      final lUri = Uri.parse(
+        'https://engine01.fuzikapp.com/play2s_l/?q=$encodedQuery',
+      );
+
+      final pUri = Uri.parse(
+        'https://engine01.fuzikapp.com/play2s_p/?q=$encodedQuery',
+      );
+
+      final responses = await Future.wait([
+        http.get(lUri),
+        http.get(pUri),
+      ]);
+
+      final lResponse = responses[0];
+      final pResponse = responses[1];
+
+      if (lResponse.statusCode != 200 || pResponse.statusCode != 200) {
+        throw Exception('Failed to load videos');
+      }
+
+      final lData = jsonDecode(lResponse.body);
+      final pData = jsonDecode(pResponse.body);
+
+      final videos = [
+        ...List<Map<String, dynamic>>.from(lData),
+        ...List<Map<String, dynamic>>.from(pData),
+      ];
+
+      return videos;
     } catch (e) {
+      print('Error fetching videos: $e');
       return [];
     }
   }
@@ -38,7 +68,7 @@ class _DashboardContentState extends State<DashboardContent> {
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
     double paddingHorizontal = screenWidth < 600 ? 16.0 : 40.0;
-    
+
     int columns = screenWidth < 400 ? 1 : (screenWidth < 600 ? 2 : 4);
 
     return SingleChildScrollView(
@@ -88,7 +118,7 @@ class _DashboardContentState extends State<DashboardContent> {
             ),
           ),
           const SizedBox(height: 24),
-          
+
           // ช่องค้นหา (Search)
           Center(
             child: Container(
@@ -102,7 +132,7 @@ class _DashboardContentState extends State<DashboardContent> {
                         controller: _searchController,
                         style: const TextStyle(color: Colors.white, fontSize: 14),
                         decoration: InputDecoration(
-                          hintText: 'Song name or artist name',
+                          hintText: 'Search by song, artist, or instrument',
                           hintStyle: const TextStyle(color: Colors.white38, fontSize: 14),
                           filled: true, fillColor: Colors.black,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 20),
@@ -116,7 +146,11 @@ class _DashboardContentState extends State<DashboardContent> {
                   SizedBox(
                     height: 40,
                     child: ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        setState(() {
+                          _searchQuery = _searchController.text.trim();
+                        });
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFFFD600), foregroundColor: Colors.black,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -130,37 +164,36 @@ class _DashboardContentState extends State<DashboardContent> {
             ),
           ),
           const SizedBox(height: 40),
-          
+
           const Text('All Jams / Videos', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
-          
+
           // ตารางวิดีโอ (GridView)
-          FutureBuilder<List<dynamic>>(
-            future: _fetchVideos(),
+          FutureBuilder<List<Map<String, dynamic>>>(
+            future: _fetchVideos(query: _searchQuery),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Color(0xFFFFD600))));
               }
               if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text('ไม่พบข้อมูลวิดีโอ', style: TextStyle(color: Colors.white54, fontSize: 16))));
+                return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text('No matching videos found', style: TextStyle(color: Colors.white54, fontSize: 16))));
               }
               final videos = snapshot.data!;
               return GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: columns, 
-                  crossAxisSpacing: 16, 
-                  mainAxisSpacing: 24, 
-                  childAspectRatio: columns == 1 ? 1.5 : 1.0, 
+                  crossAxisCount: columns,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 24,
+                  childAspectRatio: columns == 1 ? 1.5 : 1.0,
                 ),
                 itemCount: videos.length,
                 itemBuilder: (context, index) {
                   final video = videos[index];
-                  final title = video['title']?.toString() ?? '';
-                  final artist = video['artist']?.toString() ?? '';
-                  final views = '${video['views'] ?? 0} views';
-
+                  final title = video['video_title']?.toString() ?? '';
+                  final artist = video['musician_name']?.toString() ?? '';
+                  final views = '${video['view_count'] ?? 0} views';
                   return _buildVideoCard(
                     title,
                     artist,
