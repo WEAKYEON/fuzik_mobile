@@ -148,14 +148,6 @@ class _MainLayoutState extends State<MainLayout> {
           );
         }
 
-        if (value == 'Wallet'){
-          Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context)=> const Wallet(),
-              ),
-          );
-        }
         if (value == 'logout') {
           await Supabase.instance.client.auth.signOut();
           if (mounted) {
@@ -209,15 +201,6 @@ class _MainLayoutState extends State<MainLayout> {
             ],
           ),
         ),
-        const PopupMenuItem(
-          value: 'Wallet',
-          child: Row(
-          children: [
-            Icon(Icons.account_balance_wallet, size:18, color: Colors.white,),
-            SizedBox(width: 8,),
-            Text("Wallet", style: TextStyle(color: Colors.white),)
-          ],
-          )),
 
         const PopupMenuItem(
           value: 'logout',

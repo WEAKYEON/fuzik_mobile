@@ -55,16 +55,253 @@ class _ChooseVideo2State extends State<ChooseVideo2>{
    final TextEditingController _searchController=TextEditingController();
    List<Map<String,dynamic>> selectedVideos = [];
    SlotOrientation orientation=SlotOrientation.landscape;
+   
+    late Future<List<Map<String, dynamic>>> portraitVideos ;
+    late Future<List<Map<String, dynamic>>> landscapeVideos ;
 
+    @override
+    void initState(){
+      super.initState();
+      portraitVideos=_fetchPortraitVideos();
+      landscapeVideos=_fetchLandscapeVideos();
+    }
+
+  Widget buildLayoutPreview(String layoutName, List<dynamic> selectedVideos, int totalVideo, bool isTablet) {
+  switch (layoutName) {
+    case '4_01': 
+      return Column(
+        children: [
+          Expanded(child: Row(children: [
+            Expanded(child: _slot(selectedVideos, 0)),
+            Expanded(child: _slot(selectedVideos, 1)),
+          ])),
+          Expanded(child: Row(children: [
+            Expanded(child: _slot(selectedVideos, 2)),
+            Expanded(child: _slot(selectedVideos, 3)),
+          ])),
+        ],
+      );
+
+    case '3_07': 
+      return Row(
+        children: List.generate(3, (i) => Expanded(child: _slot(selectedVideos, i))),
+      );
+
+    case '3_06': 
+      return Stack(
+          children: [
+            Positioned.fill(
+              child: _slot(selectedVideos, 0),
+            ),
+
+            Positioned(
+              right: 12,
+              bottom: 12,
+              width:isTablet?180:90,
+              height:isTablet?320:160,             
+              child: _slot(selectedVideos, 2),
+              
+            ),
+
+            Positioned(
+              left: 12,
+              bottom: 12,
+              width:isTablet?180:90,
+              height:isTablet?320:160,
+              child: _slot(selectedVideos, 1),
+            ),
+          ],
+        );
+
+      case '3_05':
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: _slot(selectedVideos, 0),
+            ),
+
+            Positioned(
+              right: 12,
+              bottom: 12,
+              height:isTablet?180:90,
+              width:isTablet?320:160,             
+              child: _slot(selectedVideos, 2),
+              
+            ),
+
+            Positioned(
+              left: 12,
+              bottom: 12,
+              width:isTablet?180:90,
+              height:isTablet?320:160,
+              child: _slot(selectedVideos, 1),
+            ),
+          ],
+        );
+      case '3_02':
+        return Stack(
+          children:[
+            Positioned.fill(child:_slot(selectedVideos, 0),),
+            Positioned(
+              left: 12,
+              bottom: 12,
+              child: Row(
+              spacing:5,
+              children:[
+                SizedBox(
+                  height:isTablet?180:90,
+                  width:isTablet?320:160,
+                  child:_slot(selectedVideos, 1), ),
+                SizedBox(
+                  height:isTablet?180:90,
+                  width:isTablet?320:160,
+                  child:_slot(selectedVideos, 2), ),
+                ]
+            ),)
+          ]
+        );
+      case '3_01':
+            return Stack(
+          children:[
+            Positioned.fill(child:_slot(selectedVideos, 0),),
+            Positioned(
+              left: 12,
+              bottom: 12,
+              child: Column(
+              spacing:5,
+              children:[
+                SizedBox(
+                  height:isTablet?180:90,
+                  width:isTablet?320:160,
+                  child:_slot(selectedVideos, 1), ),
+                SizedBox(
+                  height:isTablet?180:90,
+                  width:isTablet?320:160,
+                  child:_slot(selectedVideos, 2), ),
+                ]
+            ),)
+          ]
+        );
+        case '2_07':
+        return Stack(
+          children:[
+            Positioned.fill(
+              child:_slot(selectedVideos, 0),
+            ),
+             Positioned(
+              right: 12,
+              bottom: 12,
+              width:isTablet?180:90,
+              height:isTablet?320:160,             
+              child: _slot(selectedVideos, 1),
+              
+            ),
+          ]
+        );
+        case '2_02':
+        return Stack(
+          children:[
+            Positioned.fill(
+              child:_slot(selectedVideos, 0),
+            ),
+             Positioned(
+              left: 12,
+              top: 12,
+              height:isTablet?180:90,
+              width:isTablet?320:160,             
+              child: _slot(selectedVideos, 1),
+              
+            ),
+          ]
+        );
+        case '2_03':
+        return Stack(
+          children:[
+            Positioned.fill(
+              child:_slot(selectedVideos, 0),
+            ),
+             Positioned(
+              right: 12,
+              top: 12,
+              height:isTablet?180:90,
+              width:isTablet?320:160,             
+              child: _slot(selectedVideos, 1),
+              
+            ),
+          ]
+        );
+        case '2_04':
+        return Stack(
+          children:[
+            Positioned.fill(
+              child:_slot(selectedVideos, 0),
+            ),
+             Positioned(
+              right: 12,
+              bottom: 12,
+              height:isTablet?180:90,
+              width:isTablet?320:160,             
+              child: _slot(selectedVideos, 1),
+              
+            ),
+          ]
+        );
+      case '2_01':
+        return Stack(
+          children:[
+            Positioned.fill(
+              child:_slot(selectedVideos, 0),
+            ),
+             Positioned(
+              left: 12,
+              bottom: 12,
+              height:isTablet?180:90,
+              width:isTablet?320:160,             
+              child: _slot(selectedVideos, 1),
+              
+            ),
+          ]
+        );
+
+    default:
+      return const Center(child: Text('We are sorry. Layout preview is still in development', style: TextStyle(color: Colors.white54)));
+  }
+}
+
+// Shared slot renderer — same widget type always, just swaps content
+Widget _slot(List<dynamic> selectedVideos, int index) {
+  final hasVideo = index < selectedVideos.length;
+  return GestureDetector(
+    onTap: hasVideo ? () {} : null, // wire up removal in your State class
+    child: Container(
+      margin: const EdgeInsets.all(1),
+      decoration: BoxDecoration(border: Border.all(color: Colors.black, width: 1)),
+      child: hasVideo
+          ? CachedNetworkImage(
+              imageUrl: selectedVideos[index]['preview']?.toString() ?? '',
+              fit: BoxFit.cover,
+            )
+          : Container(
+            decoration: BoxDecoration(
+                color: Colors.black,
+                border: Border.all(color: Colors.yellow, width: 1),
+              ),
+            child: Center(
+                child: Text('${index + 1}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+              ),
+          ),
+    ),
+  );
+}
   @override
   Widget build(BuildContext context){
     //print('Chosen: ${widget.layoutData}');
     int totalVideo= widget.layoutData['l_videos_num'] + widget.layoutData['p_videos_num'];
-    final imagePath = widget.layoutData['layout_file_location'];
-    final imageUrl = 'https://media05.fuzikapp.com/$imagePath';
     final layoutName= widget.layoutData['layout_name'];
-
+    final screenSize=MediaQuery.of(context).size.shortestSide;
+    final isTablet=screenSize>=600;
     bool isLandscape= orientation==SlotOrientation.landscape ;
+  print('You are viewing $layoutName');
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.black,
@@ -85,13 +322,17 @@ class _ChooseVideo2State extends State<ChooseVideo2>{
               children: [
                 Padding(
                   padding: const EdgeInsets.all(8.0),
-                  child: Image.network(
-                          imageUrl,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) {
-                                        return const Center(child: Icon(Icons.broken_image, color: Colors.grey, size: 40));
-                                      },
-                              ),
+                  child: AspectRatio(
+                    aspectRatio: 16 / 9, 
+                    child: SizedBox.expand(
+                      child: buildLayoutPreview(
+                        widget.layoutData['layout_name'],
+                        selectedVideos,
+                        totalVideo,
+                        isTablet
+                      ),
+                    ),
+                  ),
                 ),
                 Center(
                   child: Container(
@@ -289,7 +530,7 @@ class _ChooseVideo2State extends State<ChooseVideo2>{
                               child:                               
                               FutureBuilder(
                                                           
-                                future: isLandscape?_fetchLandscapeVideos():_fetchPortraitVideos(),
+                                future: isLandscape?landscapeVideos:portraitVideos,
                                 builder: (context, snapshot) {
                                 if (snapshot.connectionState == ConnectionState.waiting) {
                                   return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Color(0xFFFFD600))));
@@ -299,15 +540,15 @@ class _ChooseVideo2State extends State<ChooseVideo2>{
                                 }
                                 final videos = snapshot.data!;
                                 return Padding(
-                                  padding: EdgeInsets.fromLTRB(5, 20, 5, 0),
+                                  padding: EdgeInsets.fromLTRB(12, 20, 12, 0),
                                   child: GridView.builder(
                                     controller: scrollController,
                                     shrinkWrap: true,
                                     //physics: const NeverScrollableScrollPhysics(),
                                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: 3, 
-                                      crossAxisSpacing: 10, 
-                                      mainAxisSpacing: 10, 
+                                      crossAxisCount: isTablet?3: orientation==SlotOrientation.portrait?3:2, 
+                                      crossAxisSpacing: isTablet?10:5, 
+                                      mainAxisSpacing: isTablet?10:5, 
                                       childAspectRatio: isLandscape?16/9:9/16, 
                                     ),
                                     itemCount: videos.length,
@@ -353,16 +594,22 @@ class _ChooseVideo2State extends State<ChooseVideo2>{
                                             
                                           });
                                         },
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadiusGeometry.circular(5),
-                                          child: CachedNetworkImage(
-                                            imageUrl: preview,
-                                            fit:BoxFit.cover,
-                                            width: double.infinity,
-                                            height: double.infinity,
-                                            placeholder: (context, url) => Center(child: CircularProgressIndicator(color:Colors.yellow)),
-                                            errorWidget: (context, url, error) => Icon(Icons.error),
-                                                                            ),
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: Colors.yellow, width: 0.7),
+                                          ),
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadiusGeometry.circular(8),
+                                            child: CachedNetworkImage(
+                                              imageUrl: preview,
+                                              fit:BoxFit.cover,
+                                              width: double.infinity,
+                                              height: double.infinity,
+                                              placeholder: (context, url) => Center(child: CircularProgressIndicator(color:Colors.yellow)),
+                                              errorWidget: (context, url, error) => Icon(Icons.error),
+                                                                              ),
+                                          ),
                                         ),
                                       );
                                     },

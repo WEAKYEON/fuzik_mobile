@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'choose_video2.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class CollaborationContent extends StatefulWidget {
   final bool showBackButton; 
@@ -89,9 +90,6 @@ class _CollaborationContentState extends State<CollaborationContent> {
 
                     return InkWell(
                       onTap: () {
-                        print('You are viewing $layoutName');
-                        print("This is the layout data: $layoutData");
-                        print("Layout: $layoutsList");
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -107,10 +105,11 @@ class _CollaborationContentState extends State<CollaborationContent> {
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(4),
-                          child: Image.network(
-                            imageUrl,
+                          child: CachedNetworkImage(
+                            imageUrl:imageUrl,
                             fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) {
+                            placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: Color(0xFFFFD600))),
+                            errorWidget: (context, url, error) {
                               return const Center(child: Icon(Icons.broken_image, color: Colors.grey, size: 40));
                             },
                           ),

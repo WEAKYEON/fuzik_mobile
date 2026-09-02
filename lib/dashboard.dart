@@ -50,6 +50,25 @@ class _DashboardContentState extends State<DashboardContent> {
     }
   }
 
+Future<List<Map<String, dynamic>>> _fetchPortraitVideos() async {
+    try {
+      
+      final url=Uri.parse('https://engine01.fuzikapp.com/play2s_p/');
+      final response= await http.get(url);
+        if (response.statusCode == 200) {
+        // jsonDecode parses the raw string into a Dart Map or List
+          final data = List<Map<String, dynamic>>.from(jsonDecode(response.body),);
+          
+          return data;
+        } else {
+          
+          throw Exception('Failed to load data');
+        } 
+    } catch (e) {
+      print(e);
+      return [];
+    }
+  }
   @override
   void dispose() {
     _searchController.dispose();
@@ -58,9 +77,9 @@ class _DashboardContentState extends State<DashboardContent> {
 
   @override
   Widget build(BuildContext context) {
-    double screenWidth = MediaQuery.of(context).size.width;
+    double screenWidth = MediaQuery.of(context).size.shortestSide;
     double paddingHorizontal = screenWidth < 600 ? 16.0 : 40.0;
-    
+    bool isTablet = screenWidth >= 600;
     int columns = screenWidth < 400 ? 1 : (screenWidth < 600 ? 2 : 3);
 
     return SingleChildScrollView(
@@ -153,10 +172,78 @@ class _DashboardContentState extends State<DashboardContent> {
           ),
           const SizedBox(height: 40),
           
-          const Text('All Jams / Videos', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(isSoloSelected ? 'Portrait' : 'Group', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
-          
+
+          //Portrait Videos
+          FutureBuilder(future: _fetchPortraitVideos(), 
+          builder: (context,snapshot){
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Color(0xFFFFD600))));
+            }
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text('ไม่พบข้อมูลวิดีโอ', style: TextStyle(color: Colors.white54, fontSize: 16))));
+            }
+            final videos = snapshot.data!;
+            return SizedBox(
+              width: MediaQuery.of(context).size.width*0.8,
+              child: GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: isTablet?4:3, 
+                  crossAxisSpacing: 5, 
+                  mainAxisSpacing: 10, 
+                  childAspectRatio: 0.4, 
+                ),
+                itemCount: videos.length,
+                itemBuilder: (context, index) {
+                  final video = videos[index];
+              
+                  final title = video['video_title']?.toString() ?? '';
+                  final artist = video['musician_name']?.toString() ?? '';
+                  final views = '${video['views'] ?? 0} views';
+                  final preview = video['preview']?.toString()??'';
+              
+                  return _buildVideoCard(
+                    title,
+                    artist,
+                    views,
+                    preview,
+                    isSolo: isSoloSelected,
+                    isPortrait: true,
+                    onTap: () {
+                      if (isSoloSelected) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ViewPlayScreen(
+                              title: title,
+                              artist: artist,
+                              views: views,
+                            ),
+                          ),
+                        );
+                      } else {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const JamWatchScreen(),
+                          ),
+                        );
+                      }
+                    },
+                  );
+                },
+              ),
+            );
+          }
+          ),
+
+          Text(isSoloSelected ? 'Landscape' : 'Group', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
           // ตารางวิดีโอ (GridView)
+          //Landscape Videos
           FutureBuilder<List<dynamic>>(
             future: isSoloSelected?_fetchLandscapeVideos():_placeholderVideos(),
             builder: (context, snapshot) {
@@ -190,6 +277,7 @@ class _DashboardContentState extends State<DashboardContent> {
                     artist,
                     views,
                     preview,
+                    isPortrait: false,
                     isSolo: isSoloSelected,
                     onTap: () {
                       if (isSoloSelected) {
@@ -227,6 +315,7 @@ class _DashboardContentState extends State<DashboardContent> {
       String artist,
       String views,
       String preview, {
+        required bool isPortrait,
         required bool isSolo,
         VoidCallback? onTap,
       }) {
@@ -236,7 +325,7 @@ class _DashboardContentState extends State<DashboardContent> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AspectRatio(
-            aspectRatio: 16/9,
+            aspectRatio: isPortrait ? 9/16 : 16/9,
             child: Container(
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
@@ -249,14 +338,17 @@ class _DashboardContentState extends State<DashboardContent> {
               ),
               child: Stack(
                 children: [
-                   CachedNetworkImage(
-                      imageUrl: preview,
-                      fit:BoxFit.cover,
-                      width: double.infinity,
-                      height: double.infinity,
-                      placeholder: (context, url) => Center(child: CircularProgressIndicator(color:Colors.yellow)),
-                      errorWidget: (context, url, error) => Icon(Icons.error),
-                  ),
+                   ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                     child: CachedNetworkImage(
+                        imageUrl: preview,
+                        fit:BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        placeholder: (context, url) => Center(child: CircularProgressIndicator(color:Colors.yellow)),
+                        errorWidget: (context, url, error) => Icon(Icons.error),
+                                       ),
+                   ),
 
                   Positioned(
                     bottom: 8,
