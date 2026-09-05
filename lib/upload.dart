@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
+import 'package:http/http.dart' as http;
 
 class UploadContent extends StatefulWidget {
   final bool isActive;
@@ -42,8 +43,8 @@ class _UploadContentState extends State<UploadContent> {
     _musicTitleController.dispose();
     _originalWriterController.dispose();
     _instrumentController.dispose();
-    
-    _videoPlayerController?.dispose(); 
+
+    _videoPlayerController?.dispose();
     super.dispose();
   }
 
@@ -55,7 +56,7 @@ class _UploadContentState extends State<UploadContent> {
       if (video != null) {
         setState(() {
           _selectedVideo = File(video.path);
-          _isFileSelected = true; 
+          _isFileSelected = true;
         });
 
         _videoPlayerController = VideoPlayerController.file(_selectedVideo!)
@@ -63,10 +64,65 @@ class _UploadContentState extends State<UploadContent> {
             setState(() {});
             _videoPlayerController!.play(); // สั่งให้เล่นอัตโนมัติ
           });
-          
+
       }
     } catch (e) {
       print('เกิดข้อผิดพลาดในการเลือกไฟล์: $e');
+    }
+  }
+
+  Future<void> _uploadVideo() async {
+    if (_selectedVideo == null) {
+      return;
+    }
+
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('https://media05.fuzikapp.com/ajax_video.php'),
+      );
+
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'file',
+          _selectedVideo!.path,
+        ),
+      );
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      print('Upload status: ${response.statusCode}');
+      print('Upload response: $responseBody');
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        print('Upload status: ${response.statusCode}');
+        print('Upload response: $responseBody');
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Video uploaded successfully!'),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Video upload failed.'),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Upload error: $e');
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Upload error: $e'),
+        ),
+      );
     }
   }
 
@@ -133,7 +189,7 @@ class _UploadContentState extends State<UploadContent> {
               const Icon(Icons.download_for_offline_outlined, color: Colors.white, size: 40),
               const SizedBox(height: 10),
               ElevatedButton(
-                onPressed: _pickVideo, 
+                onPressed: _pickVideo,
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFD600), foregroundColor: Colors.black),
                 child: const Text('Select Video files', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
@@ -169,7 +225,7 @@ class _UploadContentState extends State<UploadContent> {
             ),
             const SizedBox(height: 16),
             // --- จบปุ่ม Back ---
-            
+
             layout,
           ],
         ),
@@ -182,67 +238,67 @@ class _UploadContentState extends State<UploadContent> {
     return Container(
       height: 300,
       decoration: BoxDecoration(
-        color: Colors.black, 
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white24, width: 1)
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white24, width: 1)
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),
         child: _videoPlayerController != null && _videoPlayerController!.value.isInitialized
             ? Stack(
-                alignment: Alignment.center,
-                children: [
-                  // ตัวเล่นวิดีโอ
-                  AspectRatio(
-                    aspectRatio: _videoPlayerController!.value.aspectRatio,
-                    child: VideoPlayer(_videoPlayerController!),
-                  ),
-                  // ปุ่ม Play/Pause กลางจอ
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _videoPlayerController!.value.isPlaying
-                            ? _videoPlayerController!.pause()
-                            : _videoPlayerController!.play();
-                      });
-                    },
-                    child: Icon(
-                      _videoPlayerController!.value.isPlaying 
-                          ? Icons.pause_circle_outline 
-                          : Icons.play_circle_fill,
-                      color: Colors.white.withOpacity(0.7),
-                      size: 64,
-                    ),
-                  ),
-                ],
-              )
-            : const Center(
-                // หมุนๆ ตอนกำลังโหลดวิดีโอ
-                child: CircularProgressIndicator(color: Color(0xFFFFD600)),
+          alignment: Alignment.center,
+          children: [
+            // ตัวเล่นวิดีโอ
+            AspectRatio(
+              aspectRatio: _videoPlayerController!.value.aspectRatio,
+              child: VideoPlayer(_videoPlayerController!),
+            ),
+            // ปุ่ม Play/Pause กลางจอ
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _videoPlayerController!.value.isPlaying
+                      ? _videoPlayerController!.pause()
+                      : _videoPlayerController!.play();
+                });
+              },
+              child: Icon(
+                _videoPlayerController!.value.isPlaying
+                    ? Icons.pause_circle_outline
+                    : Icons.play_circle_fill,
+                color: Colors.white.withOpacity(0.7),
+                size: 64,
               ),
+            ),
+          ],
+        )
+            : const Center(
+          // หมุนๆ ตอนกำลังโหลดวิดีโอ
+          child: CircularProgressIndicator(color: Color(0xFFFFD600)),
+        ),
       ),
     );
   }
 
   Widget _buildFormFields() => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildWhiteTextField('Video Title', controller: _videoTitleController),
-          const SizedBox(height: 12),
-          _buildWhiteTextField('Description', controller: _descriptionController, maxLines: 3),
-          const SizedBox(height: 16),
-          _buildCheckbox('I accept the terms.', _acceptTerms, (val) => setState(() => _acceptTerms = val!)),
-          _buildCheckbox('Public domain declaration.', _isPublicDomain, (val) => setState(() => _isPublicDomain = val!)),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: (_acceptTerms && _isPublicDomain) ? () {
-              print('เตรียมอัปโหลดไฟล์: ${_selectedVideo?.path}');
-            } : null, 
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFD600), disabledBackgroundColor: Colors.grey),
-            child: const Text('Save information', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold))
-          ),
-        ],
-      );
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      _buildWhiteTextField('Video Title', controller: _videoTitleController),
+      const SizedBox(height: 12),
+      _buildWhiteTextField('Description', controller: _descriptionController, maxLines: 3),
+      const SizedBox(height: 16),
+      _buildCheckbox('I accept the terms.', _acceptTerms, (val) => setState(() => _acceptTerms = val!)),
+      _buildCheckbox('Public domain declaration.', _isPublicDomain, (val) => setState(() => _isPublicDomain = val!)),
+      const SizedBox(height: 20),
+      ElevatedButton(
+          onPressed: (_acceptTerms && _isPublicDomain)
+              ? _uploadVideo
+              : null,
+          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFD600), disabledBackgroundColor: Colors.grey),
+          child: const Text('Save information', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold))
+      ),
+    ],
+  );
 
   Widget _buildWhiteTextField(String hint, {required TextEditingController controller, int maxLines = 1}) => TextField(controller: controller, maxLines: maxLines, style: const TextStyle(color: Colors.black), decoration: InputDecoration(hintText: hint, hintStyle: const TextStyle(color: Colors.grey), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)));
 

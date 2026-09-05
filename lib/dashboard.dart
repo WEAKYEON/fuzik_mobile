@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'view_play.dart';
 import 'jam_watch.dart'; 
 import 'package:http/http.dart' as http;
@@ -15,37 +16,46 @@ class DashboardContent extends StatefulWidget {
 class _DashboardContentState extends State<DashboardContent> {
   bool isSoloSelected = true; 
   final _searchController = TextEditingController();
+  String _searchQuery = '';
 
-  Future<List <Map<String, dynamic>>> _placeholderVideos() async{
-    try{
-      await Future.delayed(const Duration(seconds: 1)); 
-      return List.generate(8, (index) => {
-        'id': index.toString(),
-        'title': 'Sample Jamming ${index + 1}',
-        'artist': 'Fuzik User',
-        'views': (index + 1) * 15,
-        'date': '1 month ago',
-      });
-    }catch(e){
-      return [];
-    }
-  }
-  Future<List<Map<String, dynamic>>> _fetchLandscapeVideos() async {
+
+  Future<List<Map<String, dynamic>>> _fetchVideos({
+    String query = '',
+  }) async {
     try {
-      
-      final url=Uri.parse('https://engine01.fuzikapp.com/play2s_l/');
-      final response= await http.get(url);
-        if (response.statusCode == 200) {
-        // jsonDecode parses the raw string into a Dart Map or List
-          final data = List<Map<String, dynamic>>.from(jsonDecode(response.body),);
-          
-          return data;
-        } else {
-          
-          throw Exception('Failed to load data');
-        } 
+      final encodedQuery = Uri.encodeComponent(query);
+
+      final lUri = Uri.parse(
+        'https://engine01.fuzikapp.com/play2s_l/?q=$encodedQuery',
+      );
+
+      final pUri = Uri.parse(
+        'https://engine01.fuzikapp.com/play2s_p/?q=$encodedQuery',
+      );
+
+      final responses = await Future.wait([
+        http.get(lUri),
+        http.get(pUri),
+      ]);
+
+      final lResponse = responses[0];
+      final pResponse = responses[1];
+
+      if (lResponse.statusCode != 200 || pResponse.statusCode != 200) {
+        throw Exception('Failed to load videos');
+      }
+
+      final lData = jsonDecode(lResponse.body);
+      final pData = jsonDecode(pResponse.body);
+
+      final videos = [
+        ...List<Map<String, dynamic>>.from(lData),
+        ...List<Map<String, dynamic>>.from(pData),
+      ];
+
+      return videos;
     } catch (e) {
-      print(e);
+      print('Error fetching videos: $e');
       return [];
     }
   }
@@ -129,7 +139,7 @@ Future<List<Map<String, dynamic>>> _fetchPortraitVideos() async {
             ),
           ),
           const SizedBox(height: 24),
-          
+
           // ช่องค้นหา (Search)
           Center(
             child: Container(
@@ -143,7 +153,7 @@ Future<List<Map<String, dynamic>>> _fetchPortraitVideos() async {
                         controller: _searchController,
                         style: const TextStyle(color: Colors.white, fontSize: 14),
                         decoration: InputDecoration(
-                          hintText: 'Song name or artist name',
+                          hintText: 'Search by song, artist, or instrument',
                           hintStyle: const TextStyle(color: Colors.white38, fontSize: 14),
                           filled: true, fillColor: Colors.black,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 20),
@@ -157,7 +167,11 @@ Future<List<Map<String, dynamic>>> _fetchPortraitVideos() async {
                   SizedBox(
                     height: 40,
                     child: ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        setState(() {
+                          _searchQuery = _searchController.text.trim();
+                        });
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFFFD600), foregroundColor: Colors.black,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -243,15 +257,14 @@ Future<List<Map<String, dynamic>>> _fetchPortraitVideos() async {
           Text(isSoloSelected ? 'Landscape' : 'Group', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
           // ตารางวิดีโอ (GridView)
-          //Landscape Videos
-          FutureBuilder<List<dynamic>>(
-            future: isSoloSelected?_fetchLandscapeVideos():_placeholderVideos(),
+          FutureBuilder<List<Map<String, dynamic>>>(
+            future: _fetchVideos(query: _searchQuery),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Color(0xFFFFD600))));
               }
               if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text('ไม่พบข้อมูลวิดีโอ', style: TextStyle(color: Colors.white54, fontSize: 16))));
+                return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text('No matching videos found', style: TextStyle(color: Colors.white54, fontSize: 16))));
               }
               final videos = snapshot.data!;
               return GridView.builder(
