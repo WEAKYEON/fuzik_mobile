@@ -7,39 +7,46 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 enum SlotOrientation { landscape, portrait }
 
-Future<List<Map<String, dynamic>>> _fetchLandscapeVideos() async {
-    try {     
-      final url=Uri.parse('https://engine01.fuzikapp.com/play2s_l/');
-      final response= await http.get(url);
-        if (response.statusCode == 200) {
-        // jsonDecode parses the raw string into a Dart Map or List
-          final data = List<Map<String, dynamic>>.from(jsonDecode(response.body),);         
-          return data;
-        } else {
-          
-          throw Exception('Failed to load data');
-        } 
-    } catch (e) {
-      print('There is an error while fetching the landscape videos: $e');
-      return [];
-    }
-  }
+Future<Map<String, List<Map<String, dynamic>>>> _fetchVideos({
+    String query = '',
+  }) async {
+    try {
+      final encodedQuery = Uri.encodeComponent(query);
 
-Future<List<Map<String, dynamic>>> _fetchPortraitVideos() async {
-    try {     
-      final url=Uri.parse('https://engine01.fuzikapp.com/play2s_p/');
-      final response= await http.get(url);
-        if (response.statusCode == 200) {
-        // jsonDecode parses the raw string into a Dart Map or List
-          final data = List<Map<String, dynamic>>.from(jsonDecode(response.body),);         
-          return data;
-        } else {
-          
-          throw Exception('Failed to load data');
-        } 
+      final lUri = Uri.parse(
+        'https://engine01.fuzikapp.com/play2s_l/?q=$encodedQuery',
+      );
+
+      final pUri = Uri.parse(
+        'https://engine01.fuzikapp.com/play2s_p/?q=$encodedQuery',
+      );
+
+      final responses = await Future.wait([
+        http.get(lUri),
+        http.get(pUri),
+      ]);
+
+      final lResponse = responses[0];
+      final pResponse = responses[1];
+
+      if (lResponse.statusCode != 200 || pResponse.statusCode != 200) {
+        throw Exception('Failed to load videos');
+      }
+
+      final lData = jsonDecode(lResponse.body);
+      final pData = jsonDecode(pResponse.body);
+
+      final lvideos = List<Map<String, dynamic>>.from(lData);
+      final pvideos = List<Map<String, dynamic>>.from(pData);
+      Map<String, List<Map<String, dynamic>>> result = {
+        'landscape': lvideos,
+        'portrait': pvideos,
+      };
+      //print("Line 57: This is the result for p: ${result['portrait']}");
+      return result;
     } catch (e) {
-      print('There is an error while fetching the landscape videos: $e');
-      return [];
+      print('Error fetching videos: $e');
+      return {'landscape': [], 'portrait': []};
     }
   }
 
@@ -55,16 +62,13 @@ class _ChooseVideo2State extends State<ChooseVideo2>{
    final TextEditingController _searchController=TextEditingController();
    List<Map<String,dynamic>> selectedVideos = [];
    SlotOrientation orientation=SlotOrientation.landscape;
-   
-    late Future<List<Map<String, dynamic>>> portraitVideos ;
-    late Future<List<Map<String, dynamic>>> landscapeVideos ;
+   String searchQuery = '';
 
-    @override
-    void initState(){
-      super.initState();
-      portraitVideos=_fetchPortraitVideos();
-      landscapeVideos=_fetchLandscapeVideos();
-    }
+     @override
+      void dispose() {
+        _searchController.dispose();
+        super.dispose();
+      }
 
   Widget buildLayoutPreview(String layoutName, List<dynamic> selectedVideos, int totalVideo, bool isTablet) {
   switch (layoutName) {
@@ -293,7 +297,7 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
     ),
   );
 }
-  @override
+   @override
   Widget build(BuildContext context){
     //print('Chosen: ${widget.layoutData}');
     int totalVideo= widget.layoutData['l_videos_num'] + widget.layoutData['p_videos_num'];
@@ -301,7 +305,13 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
     final screenSize=MediaQuery.of(context).size.shortestSide;
     final isTablet=screenSize>=600;
     bool isLandscape= orientation==SlotOrientation.landscape ;
-  print('You are viewing $layoutName');
+    final videos=_fetchVideos(query: searchQuery);
+    Future<List<Map<String, dynamic>>> landscapeVideos=videos.then((value) => value['landscape'] ?? []);
+    Future<List<Map<String, dynamic>>> portraitVideos=videos.then((value) => value['portrait'] ?? []);
+
+    print('You are viewing $layoutName');
+
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.black,
@@ -385,28 +395,66 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [                         
-                           Container(  // Search bar   
-                              margin: const EdgeInsets.fromLTRB(0, 5, 0, 0),                 
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              child: TextField(
-                                controller: _searchController,
-                                style: const TextStyle(color: Colors.white),
-                                decoration: InputDecoration(
-                                  hintText: 'Search videos...',
-                                  hintStyle: TextStyle(color: Colors.grey.shade400),
-                                  prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                                  filled: true,
-                                  fillColor: Colors.black26,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide.none,
+                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  margin: const EdgeInsets.fromLTRB(12, 20, 8, 15),
+                                  child: TextField(
+                                    controller: _searchController,
+                                    style: const TextStyle(color: Colors.white),
+                                    decoration: InputDecoration(
+                                      hintText: 'Search videos...',
+                                      hintStyle: TextStyle(color: Colors.grey),
+                                      prefixIcon: const Icon(
+                                        Icons.search,
+                                        color: Colors.grey,
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.black26,
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                    ),
                                   ),
                                 ),
-                                onChanged: (query) {
-                                  // TODO: query
-                                },
                               ),
-                            ),
+
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  top: 5,
+                                  right: 12,
+                                ),
+                                child: SizedBox(
+                                  height: 40,
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        searchQuery = _searchController.text.trim();
+                                        print('Search query: $searchQuery');
+                                      });
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFFFD600),
+                                      foregroundColor: Colors.black,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                                    ),
+                                    child: const Text(
+                                      'Search',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                           SizedBox(
                               height: selectedVideos.isEmpty?0:115,
                               child: SingleChildScrollView(
@@ -465,71 +513,73 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                 ),
                               ),
                             ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-                            child: CupertinoSlidingSegmentedControl<SlotOrientation>(
-                              groupValue: orientation,
-                              backgroundColor: Colors.black26,
-                              thumbColor: Colors.yellow,
-                              onValueChanged: (value) {
-                                if (value != null) {
-                                  setState(() {
-                                    orientation = value;
-                                    print(orientation);
-                                  });
-                                }
-                              },
-                              children: {
-                                SlotOrientation.landscape: Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.crop_landscape_rounded,
-                                        size: 16,
-                                        color: orientation == SlotOrientation.landscape ? Colors.black : Colors.white,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'Landscape',
-                                        style: TextStyle(
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                              child: CupertinoSlidingSegmentedControl<SlotOrientation>(
+                                groupValue: orientation,
+                                backgroundColor: Colors.black26,
+                                thumbColor: Colors.yellow,
+                                onValueChanged: (value) {
+                                  if (value != null) {
+                                    setState(() {
+                                      orientation = value;
+                                      print(orientation);
+                                    });
+                                  }
+                                },
+                                children: {
+                                  SlotOrientation.landscape: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.crop_landscape_rounded,
+                                          size: 16,
                                           color: orientation == SlotOrientation.landscape ? Colors.black : Colors.white,
-                                          fontWeight: FontWeight.w600,
                                         ),
-                                      ),
-                                    ],
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Landscape',
+                                          style: TextStyle(
+                                            color: orientation == SlotOrientation.landscape ? Colors.black : Colors.white,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                                SlotOrientation.portrait: Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.crop_portrait_rounded,
-                                        size: 16,
-                                        color: orientation == SlotOrientation.portrait ? Colors.black : Colors.white,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'Portrait',
-                                        style: TextStyle(
+                                  SlotOrientation.portrait: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.crop_portrait_rounded,
+                                          size: 16,
                                           color: orientation == SlotOrientation.portrait ? Colors.black : Colors.white,
-                                          fontWeight: FontWeight.w600,
                                         ),
-                                      ),
-                                    ],
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Portrait',
+                                          style: TextStyle(
+                                            color: orientation == SlotOrientation.portrait ? Colors.black : Colors.white,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              },
+                                },
+                              ),
                             ),
                           ),
                           SizedBox(width:double.infinity, height: 20,) ,
                           Expanded(
                               child:                               
-                              FutureBuilder(
-                                                          
+                              FutureBuilder(                           
                                 future: isLandscape?landscapeVideos:portraitVideos,
                                 builder: (context, snapshot) {
                                 if (snapshot.connectionState == ConnectionState.waiting) {

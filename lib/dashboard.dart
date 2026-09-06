@@ -19,7 +19,7 @@ class _DashboardContentState extends State<DashboardContent> {
   String _searchQuery = '';
 
 
-  Future<List<Map<String, dynamic>>> _fetchVideos({
+  Future<Map<String, List<Map<String, dynamic>>>> _fetchVideos({
     String query = '',
   }) async {
     try {
@@ -48,37 +48,20 @@ class _DashboardContentState extends State<DashboardContent> {
       final lData = jsonDecode(lResponse.body);
       final pData = jsonDecode(pResponse.body);
 
-      final videos = [
-        ...List<Map<String, dynamic>>.from(lData),
-        ...List<Map<String, dynamic>>.from(pData),
-      ];
-
-      return videos;
+      final lvideos = List<Map<String, dynamic>>.from(lData);
+      final pvideos = List<Map<String, dynamic>>.from(pData);
+      Map<String, List<Map<String, dynamic>>> result = {
+        'landscape': lvideos,
+        'portrait': pvideos,
+      };
+      //print("Line 57: This is the result for p: ${result['portrait']}");
+      return result;
     } catch (e) {
       print('Error fetching videos: $e');
-      return [];
+      return {'landscape': [], 'portrait': []};
     }
   }
 
-Future<List<Map<String, dynamic>>> _fetchPortraitVideos() async {
-    try {
-      
-      final url=Uri.parse('https://engine01.fuzikapp.com/play2s_p/');
-      final response= await http.get(url);
-        if (response.statusCode == 200) {
-        // jsonDecode parses the raw string into a Dart Map or List
-          final data = List<Map<String, dynamic>>.from(jsonDecode(response.body),);
-          
-          return data;
-        } else {
-          
-          throw Exception('Failed to load data');
-        } 
-    } catch (e) {
-      print(e);
-      return [];
-    }
-  }
   @override
   void dispose() {
     _searchController.dispose();
@@ -190,15 +173,17 @@ Future<List<Map<String, dynamic>>> _fetchPortraitVideos() async {
           const SizedBox(height: 16),
 
           //Portrait Videos
-          FutureBuilder(future: _fetchPortraitVideos(), 
+          FutureBuilder<Map<String, List<Map<String, dynamic>>>>(
+          future: _fetchVideos(query: _searchQuery), 
           builder: (context,snapshot){
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Color(0xFFFFD600))));
             }
-            if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text('ไม่พบข้อมูลวิดีโอ', style: TextStyle(color: Colors.white54, fontSize: 16))));
+            if (!snapshot.hasData || snapshot.data!.isEmpty || snapshot.data!['portrait']!.isEmpty) {
+              return  Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text('Sorry, we could not find any portrait videos with $_searchQuery.', style: TextStyle(color: Colors.white54, fontSize: 16))));
             }
-            final videos = snapshot.data!;
+            print('Line 185: This is the snapshot data: ${snapshot.data}');
+            final videos = snapshot.data!['portrait']!;
             return SizedBox(
               width: MediaQuery.of(context).size.width*0.8,
               child: GridView.builder(
@@ -257,16 +242,16 @@ Future<List<Map<String, dynamic>>> _fetchPortraitVideos() async {
           Text(isSoloSelected ? 'Landscape' : 'Group', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
           // ตารางวิดีโอ (GridView)
-          FutureBuilder<List<Map<String, dynamic>>>(
+          FutureBuilder<Map<String, List<Map<String, dynamic>>>>(
             future: _fetchVideos(query: _searchQuery),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Color(0xFFFFD600))));
               }
-              if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text('No matching videos found', style: TextStyle(color: Colors.white54, fontSize: 16))));
+              if (!snapshot.hasData || snapshot.data!.isEmpty || snapshot.data!['landscape']!.isEmpty) {
+                return  Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text('Sorry, we could not find any landscape videos with $_searchQuery.', style: TextStyle(color: Colors.white54, fontSize: 16))));
               }
-              final videos = snapshot.data!;
+              final videos = snapshot.data!['landscape']!;
               return GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),

@@ -137,89 +137,97 @@ class _AdjustTimelineScreenState extends State<AdjustTimelineScreen> {
               ),
               const SizedBox(width: 12),
               // ปุ่มปรับจังหวะละเอียด (< >)
-              Row(
-                children: [
-                  Text(
-                    '${secondsDelay > 0 ? '+' : ''}${secondsDelay.toStringAsFixed(2)}s',
-                    style: TextStyle(color: trackColors[index], fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_left, color: Colors.white),
-                    onPressed: () => setState(() => offsets[index] -= 5),
-                    constraints: const BoxConstraints(),
-                    padding: EdgeInsets.zero,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_right, color: Colors.white),
-                    onPressed: () => setState(() => offsets[index] += 5),
-                    constraints: const BoxConstraints(),
-                    padding: EdgeInsets.zero,
-                  ),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          '${secondsDelay > 0 ? '+' : ''}${secondsDelay.toStringAsFixed(2)}s',
+                          style: TextStyle(color: trackColors[index], fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.chevron_left, color: Colors.white),
+                          onPressed: () => setState(() => offsets[index] -= 5),
+                          constraints: const BoxConstraints(),
+                          padding: EdgeInsets.zero,
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.chevron_right, color: Colors.white),
+                          onPressed: () => setState(() => offsets[index] += 5),
+                          constraints: const BoxConstraints(),
+                          padding: EdgeInsets.zero,
+                        ),
+                      ],
+                    ),
+                    Container(
+                            height: 60,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey),
+                            ),
+                            clipBehavior: Clip.hardEdge,
+                            child: GestureDetector(
+                onPanUpdate: (details) {
+                  setState(() {
+                    offsets[index] += details.delta.dx;
+                  });
+                },
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: RulerPainter(),
+                      ),
+                    ),
+                    
+                    Transform.translate(
+                      offset: Offset(offsets[index], 0),
+                      child: Center(
+                        child: Container(
+                          height: 20,
+                          width: 1000,
+                          child: Row(
+                            children: List.generate(
+                              100,
+                              (i) {
+                                final wave = [
+                                  8, 14, 20, 12, 28, 35, 24, 16, 10, 18,
+                                  30, 38, 26, 20, 12, 16, 24, 32, 40, 28,
+                                  18, 10, 14, 26, 34, 42, 30, 20, 14, 22,
+                                  32, 38, 28, 18, 12, 20, 30, 36, 24, 16,
+                                ];
+                
+                                final height = wave[i % wave.length];
+                
+                                return Container(
+                                  margin: const EdgeInsets.symmetric(horizontal: 1),
+                                  width: 2,
+                                  height: height.toDouble(),
+                                  color: trackColors[index],
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                            ),
+                          ),
+                  ],
+                ),
               )
             ],
           ),
           const SizedBox(height: 8),
 
-          Container(
-            height: 60,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey),
-            ),
-            clipBehavior: Clip.hardEdge,
-            child: GestureDetector(
-              onPanUpdate: (details) {
-                setState(() {
-                  offsets[index] += details.delta.dx;
-                });
-              },
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: RulerPainter(),
-                    ),
-                  ),
-                  
-                  Transform.translate(
-                    offset: Offset(offsets[index], 0),
-                    child: Center(
-                      child: Container(
-                        height: 20,
-                        width: 1000,
-                        child: Row(
-                          children: List.generate(
-                            100,
-                            (i) {
-                              final wave = [
-                                8, 14, 20, 12, 28, 35, 24, 16, 10, 18,
-                                30, 38, 26, 20, 12, 16, 24, 32, 40, 28,
-                                18, 10, 14, 26, 34, 42, 30, 20, 14, 22,
-                                32, 38, 28, 18, 12, 20, 30, 36, 24, 16,
-                              ];
-
-                              final height = wave[i % wave.length];
-
-                              return Container(
-                                margin: const EdgeInsets.symmetric(horizontal: 1),
-                                width: 2,
-                                height: height.toDouble(),
-                                color: trackColors[index],
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          
         ],
       ),
     );
