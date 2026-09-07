@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-import 'payment.dart';
 import 'wallet_api.dart';
 
 class Wallet extends StatefulWidget {
@@ -41,84 +41,77 @@ class _WalletState extends State<Wallet> {
     } catch (_) {}
   }
 
-  Future<void> _openCheckout(CoinPack pack) async {
-    final email = _api.currentEmail ?? '';
-
-    final purchased = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => Payment(api: _api, email: email, pack: pack),
-      ),
+  Future<void> _openPayment() async {
+    final uri = Uri.parse('https://tetrasolution.com/paysolution/payment');
+    final launched = await launchUrl(
+      uri,
+      mode: LaunchMode.inAppBrowserView,
     );
-
-    if (purchased == true) {
-      await _refresh();
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open the payment page.')),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: RefreshIndicator(
-          color: Colors.yellow,
-          backgroundColor: _cardColor,
-          onRefresh: _refresh,
-          child: FutureBuilder<List<CoinPack>>(
-            future: _future,
-            builder: (context, snapshot) {
-              final packs = snapshot.data ?? WalletApi.defaultPacks;
+    return RefreshIndicator(
+      color: Colors.yellow,
+      backgroundColor: _cardColor,
+      onRefresh: _refresh,
+      child: FutureBuilder<List<CoinPack>>(
+        future: _future,
+        builder: (context, snapshot) {
+          final packs = snapshot.data ?? WalletApi.defaultPacks;
 
-              return SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Wallet',
-                      style: TextStyle(
-                        color: Colors.yellow,
-                        fontSize: 34,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Manage your coins and buy more when you need them.',
-                      style: TextStyle(color: Colors.white70, fontSize: 15),
-                    ),
-                    const SizedBox(height: 28),
-
-                    _buildBalanceSection(),
-                    const SizedBox(height: 32),
-
-                    const Text(
-                      'Buy coins',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    ...packs.map(
-                      (pack) => Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: _buildPackageCard(
-                          pack: pack,
-                          onBuy: () => _openCheckout(pack),
-                        ),
-                      ),
-                    ),
-                  ],
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Wallet',
+                  style: TextStyle(
+                    color: Colors.yellow,
+                    fontSize: 34,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              );
-            },
-          ),
-        ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Manage your coins and buy more when you need them.',
+                  style: TextStyle(color: Colors.white70, fontSize: 15),
+                ),
+                const SizedBox(height: 28),
+
+                _buildBalanceSection(),
+                const SizedBox(height: 32),
+
+                const Text(
+                  'Buy coins',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                ...packs.map(
+                  (pack) => Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: _buildPackageCard(
+                      pack: pack,
+                      onBuy: _openPayment,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

@@ -42,14 +42,6 @@ class WalletSummary {
   const WalletSummary({this.freeBalance, this.freeCap, this.paidBalance});
 }
 
-class WalletApiException implements Exception {
-  final String message;
-  WalletApiException(this.message);
-
-  @override
-  String toString() => message;
-}
-
 class WalletApi {
   WalletApi({http.Client? client}) : _client = client ?? http.Client();
 
@@ -73,12 +65,6 @@ class WalletApi {
       price: 269,
       featured: true,
     ),
-  ];
-
-  static const List<Map<String, String>> paymentMethods = [
-    {'code': 'card', 'label': 'Credit / debit card'},
-    {'code': 'promptpay', 'label': 'PromptPay'},
-    {'code': 'truemoney', 'label': 'TrueMoney Wallet'},
   ];
 
   String get _engineUrl =>
@@ -151,26 +137,6 @@ class WalletApi {
       }
     } catch (_) {}
     return defaultPacks;
-  }
-
-  Future<void> purchaseCoinPackage({
-    required String email,
-    required String packCode,
-    required String paymentMethod,
-  }) async {
-    final uri = Uri.parse('$_engineUrl/purchase_coin_package').replace(
-      queryParameters: {
-        'email': email,
-        'pack_code': packCode,
-        'payment_method': paymentMethod,
-      },
-    );
-    final res = await _client.get(uri).timeout(_timeout);
-    if (res.statusCode != 200 && res.statusCode != 201) {
-      throw WalletApiException(
-        'The purchase could not be completed (${res.statusCode}).',
-      );
-    }
   }
 
   void dispose() => _client.close();
