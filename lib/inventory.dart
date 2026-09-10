@@ -5,7 +5,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'inventory_video.dart';
 
 class InventoryContent extends StatefulWidget {
-  const InventoryContent({super.key});
+  final bool isActive;
+
+  const InventoryContent({
+    super.key,
+    required this.isActive,
+  });
 
   @override
   State<InventoryContent> createState() => _InventoryContentState();
@@ -21,6 +26,15 @@ class _InventoryContentState extends State<InventoryContent> {
   void initState() {
     super.initState();
     _loadInventory();
+  }
+
+  @override
+  void didUpdateWidget(covariant InventoryContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.isActive && !oldWidget.isActive) {
+      _loadInventory();
+    }
   }
 
   Future<void> _loadInventory() async {
@@ -276,14 +290,6 @@ class _InventoryContentState extends State<InventoryContent> {
                     ),
                   ),
 
-                  // Play icon
-                  const Center(
-                    child: Icon(
-                      Icons.play_circle_fill,
-                      color: Colors.white70,
-                      size: 48,
-                    ),
-                  ),
 
                   // Edit, Delete
                   Positioned(

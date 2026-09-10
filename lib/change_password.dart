@@ -9,39 +9,50 @@ class ChangePasswordScreen extends StatefulWidget {
       _ChangePasswordScreenState();
 }
 
-class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
-  final _currentPasswordController = TextEditingController();
-  final _newPasswordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
+class _ChangePasswordScreenState
+    extends State<ChangePasswordScreen> {
+  final _currentPasswordController =
+  TextEditingController();
+  final _newPasswordController =
+  TextEditingController();
+  final _confirmPasswordController =
+  TextEditingController();
 
   bool _isLoading = false;
-  bool _showPasswordTooShort = false;
-  bool _showPasswordMismatch = false;
+
   bool _obscureCurrentPassword = true;
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
 
   bool get _isPasswordTooShort {
-    final password = _newPasswordController.text;
+    final password =
+        _newPasswordController.text;
 
-    return _showPasswordTooShort &&
-        password.isNotEmpty &&
+    return password.isNotEmpty &&
         password.length < 6;
   }
 
   bool get _isPasswordMismatch {
-    final password = _newPasswordController.text;
-    final confirmPassword = _confirmPasswordController.text;
+    final password =
+        _newPasswordController.text;
+
+    final confirmPassword =
+        _confirmPasswordController.text;
 
     return password.isNotEmpty &&
         confirmPassword.isNotEmpty &&
+        confirmPassword.length >= password.length &&
         password != confirmPassword;
   }
 
   bool get _isFormValid {
-    return _currentPasswordController.text.isNotEmpty &&
+    return _currentPasswordController
+        .text
+        .isNotEmpty &&
         _newPasswordController.text.length >= 6 &&
-        _confirmPasswordController.text.isNotEmpty &&
+        _confirmPasswordController
+            .text
+            .isNotEmpty &&
         _newPasswordController.text ==
             _confirmPasswordController.text;
   }
@@ -51,104 +62,93 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     _currentPasswordController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
+
     super.dispose();
   }
 
   void _onFieldChanged(String value) {
-    if (_showPasswordMismatch || _showPasswordTooShort) {
-      setState(() {
-        _showPasswordMismatch = false;
-        _showPasswordTooShort = false;
-      });
-    } else {
-      setState(() {});
-    }
-  }
-
-  void _checkNewPassword() {
-    setState(() {
-      _showPasswordTooShort =
-          _newPasswordController.text.isNotEmpty &&
-              _newPasswordController.text.length < 6;
-    });
-  }
-
-  void _checkConfirmPassword() {
-    setState(() {
-      _showPasswordMismatch = _isPasswordMismatch;
-    });
+    setState(() {});
   }
 
   Future<void> _changePassword() async {
-    setState(() {
-      _showPasswordTooShort =
-          _newPasswordController.text.isNotEmpty &&
-              _newPasswordController.text.length < 6;
-
-      _showPasswordMismatch = _isPasswordMismatch;
-    });
-
-    if (!_isFormValid) {
+    if (!_isFormValid || _isLoading) {
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+    });
 
     try {
-      final currentUser = Supabase.instance.client.auth.currentUser;
-      if (currentUser == null || currentUser.email == null) {
-        throw Exception('User is not logged in.');
+      final currentUser =
+          Supabase.instance.client.auth.currentUser;
+
+      if (currentUser == null ||
+          currentUser.email == null) {
+        throw Exception(
+          'User is not logged in.',
+        );
       }
 
-      await Supabase.instance.client.auth.signInWithPassword(
+      // Verify current password first
+      await Supabase.instance.client.auth
+          .signInWithPassword(
         email: currentUser.email!,
-        password: _currentPasswordController.text,
+        password:
+        _currentPasswordController.text,
       );
 
-      await Supabase.instance.client.auth.updateUser(
+      // Update to new password
+      await Supabase.instance.client.auth
+          .updateUser(
         UserAttributes(
-          password: _newPasswordController.text,
+          password:
+          _newPasswordController.text,
         ),
       );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Password changed successfully.',
-            ),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+      if (!mounted) return;
 
-        Navigator.pop(context);
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Password changed successfully.',
+          ),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+      Navigator.pop(context);
     } on AuthException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed: ${e.message}'), // แจ้งเตือนจาก Supabase โดยตรง
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed: ${e.message}',
           ),
-        );
-      }
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'An error occurred: ${e.toString()}',
-            ),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'An error occurred: ${e.toString()}',
           ),
-        );
-      }
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
@@ -157,16 +157,21 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
+
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
+
         leading: IconButton(
           icon: const Icon(
             Icons.arrow_back,
             color: Colors.white,
           ),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            Navigator.pop(context);
+          },
         ),
+
         title: const Text(
           'Change Password',
           style: TextStyle(
@@ -176,6 +181,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           ),
         ),
       ),
+
       body: Stack(
         children: [
           // Background
@@ -189,7 +195,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           // Dark overlay
           Positioned.fill(
             child: Container(
-              color: Colors.black.withValues(alpha: 0.45),
+              color: Colors.black.withValues(
+                alpha: 0.45,
+              ),
             ),
           ),
 
@@ -200,22 +208,31 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 horizontal: 24,
                 vertical: 24,
               ),
+
               child: Container(
                 padding: const EdgeInsets.all(32),
+
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.7),
-                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white.withValues(
+                    alpha: 0.7,
+                  ),
+                  borderRadius:
+                  BorderRadius.circular(12),
                 ),
+
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  crossAxisAlignment:
+                  CrossAxisAlignment.stretch,
+
                   children: [
                     const Text(
                       'Change Password',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                        fontWeight:
+                        FontWeight.bold,
                         color: Colors.black87,
                       ),
                     ),
@@ -223,14 +240,19 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     const SizedBox(height: 32),
 
                     // Current Password
-                    _buildLabel('Current Password'),
+                    _buildLabel(
+                      'Current Password',
+                    ),
+
                     _buildInput(
                       _currentPasswordController,
                       'Enter your current password',
-                      obscure: _obscureCurrentPassword,
+                      obscure:
+                      _obscureCurrentPassword,
                       onToggleVisibility: () {
                         setState(() {
-                          _obscureCurrentPassword = !_obscureCurrentPassword;
+                          _obscureCurrentPassword =
+                          !_obscureCurrentPassword;
                         });
                       },
                     ),
@@ -238,22 +260,29 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     const SizedBox(height: 20),
 
                     // New Password
-                    _buildLabel('New Password'),
+                    _buildLabel(
+                      'New Password',
+                    ),
+
                     _buildInput(
                       _newPasswordController,
                       'Enter your new password',
-                      obscure: _obscureNewPassword,
+                      obscure:
+                      _obscureNewPassword,
                       onToggleVisibility: () {
                         setState(() {
-                          _obscureNewPassword = !_obscureNewPassword;
+                          _obscureNewPassword =
+                          !_obscureNewPassword;
                         });
                       },
-                      onEditingComplete: _checkNewPassword,
                     ),
 
                     if (_isPasswordTooShort)
                       const Padding(
-                        padding: EdgeInsets.only(top: 8),
+                        padding:
+                        EdgeInsets.only(
+                          top: 8,
+                        ),
                         child: Text(
                           'Password must be at least 6 characters',
                           style: TextStyle(
@@ -266,22 +295,29 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     const SizedBox(height: 24),
 
                     // Confirm New Password
-                    _buildLabel('Confirm New Password'),
+                    _buildLabel(
+                      'Confirm New Password',
+                    ),
+
                     _buildInput(
                       _confirmPasswordController,
                       'Confirm your new password',
-                      obscure: _obscureConfirmPassword,
+                      obscure:
+                      _obscureConfirmPassword,
                       onToggleVisibility: () {
                         setState(() {
-                          _obscureConfirmPassword = !_obscureConfirmPassword;
+                          _obscureConfirmPassword =
+                          !_obscureConfirmPassword;
                         });
                       },
-                      onEditingComplete: _checkConfirmPassword,
                     ),
 
-                    if (_showPasswordMismatch)
+                    if (_isPasswordMismatch)
                       const Padding(
-                        padding: EdgeInsets.only(top: 8),
+                        padding:
+                        EdgeInsets.only(
+                          top: 8,
+                        ),
                         child: Text(
                           'Passwords do not match',
                           style: TextStyle(
@@ -296,48 +332,79 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     // Change Password button
                     Container(
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: _isFormValid
+                        borderRadius:
+                        BorderRadius.circular(
+                          8,
+                        ),
+
+                        boxShadow:
+                        _isFormValid &&
+                            !_isLoading
                             ? [
                           BoxShadow(
-                            color: const Color(0xFFFFD600)
-                                .withValues(alpha: 0.6),
+                            color:
+                            const Color(
+                              0xFFFFD600,
+                            ).withValues(
+                              alpha: 0.6,
+                            ),
                             blurRadius: 20,
                             spreadRadius: 2,
                           ),
                         ]
                             : [],
                       ),
+
                       child: ElevatedButton(
                         onPressed:
-                        _isLoading ? null : _changePassword,
-                        style: ElevatedButton.styleFrom(
+                        _isFormValid &&
+                            !_isLoading
+                            ? _changePassword
+                            : null,
+
+                        style:
+                        ElevatedButton.styleFrom(
                           backgroundColor:
-                          const Color(0xFFFFD600),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 32,
-                            vertical: 14,
+                          const Color(
+                            0xFFFFD600,
                           ),
-                          shape: RoundedRectangleBorder(
+
+                          disabledBackgroundColor:
+                          Colors.grey.shade400,
+
+                          minimumSize:
+                          const Size(
+                            double.infinity,
+                            50,
+                          ),
+
+                          shape:
+                          RoundedRectangleBorder(
                             borderRadius:
-                            BorderRadius.circular(8),
+                            BorderRadius.circular(
+                              8,
+                            ),
                           ),
                         ),
+
                         child: _isLoading
                             ? const SizedBox(
                           height: 20,
                           width: 20,
                           child:
                           CircularProgressIndicator(
-                            color: Colors.black,
+                            color:
+                            Colors.black,
                             strokeWidth: 2,
                           ),
                         )
                             : const Text(
                           'Change Password',
                           style: TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold,
+                            color:
+                            Colors.black,
+                            fontWeight:
+                            FontWeight.bold,
                             fontSize: 16,
                           ),
                         ),
@@ -355,7 +422,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   Widget _buildLabel(String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(
+        bottom: 8,
+      ),
+
       child: Text(
         text,
         style: const TextStyle(
@@ -370,32 +440,37 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       TextEditingController controller,
       String hint, {
         bool obscure = false,
-        VoidCallback? onEditingComplete,
         VoidCallback? onToggleVisibility,
       }) {
     return TextField(
       controller: controller,
       obscureText: obscure,
+
       onChanged: _onFieldChanged,
-      onEditingComplete: onEditingComplete,
-      textInputAction: onEditingComplete != null
-          ? TextInputAction.done
-          : TextInputAction.next,
+
       cursorColor: Colors.black,
+
       style: const TextStyle(
         color: Colors.black87,
         fontSize: 16,
         fontWeight: FontWeight.w500,
       ),
+
       decoration: InputDecoration(
         hintText: hint,
+
         hintStyle: const TextStyle(
           color: Colors.grey,
           fontSize: 16,
         ),
+
         filled: true,
-        fillColor: const Color(0xFFF4F7FC),
-        suffixIcon: onToggleVisibility != null
+        fillColor: const Color(
+          0xFFF4F7FC,
+        ),
+
+        suffixIcon:
+        onToggleVisibility != null
             ? IconButton(
           icon: Icon(
             obscure
@@ -403,14 +478,19 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 : Icons.visibility,
             color: Colors.grey,
           ),
-          onPressed: onToggleVisibility,
+          onPressed:
+          onToggleVisibility,
         )
             : null,
+
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius:
+          BorderRadius.circular(8),
           borderSide: BorderSide.none,
         ),
-        contentPadding: const EdgeInsets.symmetric(
+
+        contentPadding:
+        const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 16,
         ),

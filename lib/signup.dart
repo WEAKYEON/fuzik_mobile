@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:flutter/gestures.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -11,10 +11,9 @@ class SignupPage extends StatefulWidget {
 }
 
 class _SignupPageState extends State<SignupPage> {
-  // 🟢 เพิ่ม Controller สำหรับรับค่าตามหน้าเว็บ
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
-  final _usernameController = TextEditingController(); // Display name
+  final _usernameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -23,24 +22,36 @@ class _SignupPageState extends State<SignupPage> {
   final _instrumentController = TextEditingController();
 
   bool _isLoading = false;
-  bool _acceptTerms = false; // Checkbox ยอมรับเงื่อนไข
+  bool _acceptTerms = false;
+
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+
+  bool get _isPasswordTooShort {
+    final password = _passwordController.text;
+
+    return password.isNotEmpty &&
+        password.length < 6;
+  }
 
   bool get _isPasswordMismatch {
     final password = _passwordController.text;
     final confirmPassword = _confirmPasswordController.text;
+
     return password.isNotEmpty &&
         confirmPassword.isNotEmpty &&
+        confirmPassword.length >= password.length &&
         password != confirmPassword;
   }
 
-  // 🟢 บังคับว่าต้องกรอกข้อมูลที่จำเป็นให้ครบ และติ๊กถูก
   bool get _isFormValid {
     return _usernameController.text.trim().isNotEmpty &&
         _emailController.text.trim().isNotEmpty &&
-        _passwordController.text.isNotEmpty &&
+        _passwordController.text.length >= 6 &&
         _confirmPasswordController.text.isNotEmpty &&
-        !_isPasswordMismatch &&
-        _acceptTerms; 
+        _passwordController.text ==
+            _confirmPasswordController.text &&
+        _acceptTerms;
   }
 
   @override
@@ -54,6 +65,7 @@ class _SignupPageState extends State<SignupPage> {
     _confirmPasswordController.dispose();
     _genreController.dispose();
     _instrumentController.dispose();
+
     super.dispose();
   }
 
@@ -62,74 +74,120 @@ class _SignupPageState extends State<SignupPage> {
   }
 
   Future<void> _signUp() async {
-    setState(() => _isLoading = true);
+    if (!_isFormValid || _isLoading) {
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
 
     try {
-      final AuthResponse res = await Supabase.instance.client.auth.signUp(
+      final AuthResponse res =
+      await Supabase.instance.client.auth.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
-        data: {'username': _usernameController.text.trim()}, 
+        data: {
+          'username':
+          _usernameController.text.trim(),
+        },
       );
 
       if (res.user != null) {
         try {
-          // ดึงค่าทั้งหมดมาเตรียมไว้
-          final String firstName = _firstNameController.text.trim();
-          final String lastName = _lastNameController.text.trim();
-          final String displayName = _usernameController.text.trim();
-          final String phone = _phoneController.text.trim();
-          final String email = _emailController.text.trim();
-          final String genre = _genreController.text.trim();
-          final String instrument = _instrumentController.text.trim();
+          final firstName =
+          _firstNameController.text.trim();
 
-          final Uri url = Uri.parse(
-            'https://engine01.fuzikapp.com/create_musician2?display_name=$displayName&email=$email&first_name=$firstName&last_name=$lastName&genre=$genre&instrument=$instrument&tel=$phone'
+          final lastName =
+          _lastNameController.text.trim();
+
+          final displayName =
+          _usernameController.text.trim();
+
+          final phone =
+          _phoneController.text.trim();
+
+          final email =
+          _emailController.text.trim();
+
+          final genre =
+          _genreController.text.trim();
+
+          final instrument =
+          _instrumentController.text.trim();
+
+          final url = Uri.parse(
+            'https://engine01.fuzikapp.com/create_musician2'
+                '?display_name=${Uri.encodeComponent(displayName)}'
+                '&email=${Uri.encodeComponent(email)}'
+                '&first_name=${Uri.encodeComponent(firstName)}'
+                '&last_name=${Uri.encodeComponent(lastName)}'
+                '&genre=${Uri.encodeComponent(genre)}'
+                '&instrument=${Uri.encodeComponent(instrument)}'
+                '&tel=${Uri.encodeComponent(phone)}',
           );
 
           final response = await http.get(url);
 
-          if (response.statusCode == 200 || response.statusCode == 201) {
-            print('สร้างโปรไฟล์ใน Engine01 สำเร็จ');
+          if (response.statusCode == 200 ||
+              response.statusCode == 201) {
+            debugPrint(
+              'Profile created in Engine01 successfully.',
+            );
           } else {
-            print('เซฟลง Engine01 ไม่ผ่าน: ${response.statusCode} - ${response.body}');
+            debugPrint(
+              'Failed to create Engine01 profile: '
+                  '${response.statusCode} - ${response.body}',
+            );
           }
         } catch (e) {
-          print('ยิง API ไป Engine01 ไม่สำเร็จ: $e');
+          debugPrint(
+            'Engine01 API error: $e',
+          );
         }
       }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Registration Success! You can now login.'),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Registration Success! You can now login.',
           ),
-        );
-        Navigator.pop(context); 
-      }
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+      Navigator.pop(context);
     } on AuthException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.message),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('An error occurred: ${e.toString()}'),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'An error occurred: ${e.toString()}',
           ),
-        );
-      }
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -138,7 +196,6 @@ class _SignupPageState extends State<SignupPage> {
     return Scaffold(
       body: Stack(
         children: [
-          // Background image
           Positioned.fill(
             child: Image.asset(
               'assets/images/background_login.jpg',
@@ -146,103 +203,230 @@ class _SignupPageState extends State<SignupPage> {
             ),
           ),
 
-          Positioned(
-            top: 50,
-            left: 16,
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white, size: 30),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ),
-
-          // Signup form
           Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 80),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 80,
+              ),
               child: Container(
                 padding: const EdgeInsets.all(32),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white.withValues(
+                    alpha: 0.9,
+                  ),
+                  borderRadius:
+                  BorderRadius.circular(12),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  crossAxisAlignment:
+                  CrossAxisAlignment.stretch,
                   children: [
                     const Text(
                       'Register',
                       textAlign: TextAlign.left,
                       style: TextStyle(
                         fontSize: 28,
-                        fontWeight: FontWeight.bold,
+                        fontWeight:
+                        FontWeight.bold,
                         color: Colors.black,
                       ),
                     ),
+
                     const SizedBox(height: 8),
+
                     const Text(
                       'Create your account. It\'s free and only take a minute',
-                      style: TextStyle(color: Colors.black87, fontSize: 14),
+                      style: TextStyle(
+                        color: Colors.black87,
+                        fontSize: 14,
+                      ),
                     ),
+
                     const SizedBox(height: 24),
-                    
+
                     Row(
                       children: [
-                        Expanded(child: _buildInput(_firstNameController, 'Firstname')),
+                        Expanded(
+                          child: _buildInput(
+                            _firstNameController,
+                            'Firstname',
+                          ),
+                        ),
                         const SizedBox(width: 12),
-                        Expanded(child: _buildInput(_lastNameController, 'Lastname')),
+                        Expanded(
+                          child: _buildInput(
+                            _lastNameController,
+                            'Lastname',
+                          ),
+                        ),
                       ],
                     ),
+
                     const SizedBox(height: 16),
-                    _buildInput(_usernameController, 'Display name'),
+
+                    _buildInput(
+                      _usernameController,
+                      'Display name',
+                    ),
+
                     const SizedBox(height: 16),
-                    _buildInput(_phoneController, 'Telephone', inputType: TextInputType.phone),
+
+                    _buildInput(
+                      _phoneController,
+                      'Telephone',
+                      inputType:
+                      TextInputType.phone,
+                    ),
+
                     const SizedBox(height: 16),
-                    _buildInput(_emailController, 'Email', inputType: TextInputType.emailAddress),
+
+                    _buildInput(
+                      _emailController,
+                      'Email',
+                      inputType:
+                      TextInputType.emailAddress,
+                    ),
+
                     const SizedBox(height: 16),
-                    _buildInput(_passwordController, 'Password', obscure: true),
-                    const SizedBox(height: 16),
-                    _buildInput(_confirmPasswordController, 'Confirm Password', obscure: true),
-                    if (_isPasswordMismatch)
+
+                    _buildInput(
+                      _passwordController,
+                      'Password',
+                      obscure:
+                      _obscurePassword,
+                      onToggleVisibility: () {
+                        setState(() {
+                          _obscurePassword =
+                          !_obscurePassword;
+                        });
+                      },
+                    ),
+
+                    if (_isPasswordTooShort)
                       const Padding(
-                        padding: EdgeInsets.only(top: 8),
+                        padding:
+                        EdgeInsets.only(
+                          top: 8,
+                        ),
                         child: Text(
-                          'Passwords do not match',
-                          style: TextStyle(color: Colors.red, fontSize: 14),
+                          'Password must be at least 6 characters',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
+
                     const SizedBox(height: 16),
-                    _buildInput(_genreController, 'Music genre'),
+
+                    _buildInput(
+                      _confirmPasswordController,
+                      'Confirm Password',
+                      obscure:
+                      _obscureConfirmPassword,
+                      onToggleVisibility: () {
+                        setState(() {
+                          _obscureConfirmPassword =
+                          !_obscureConfirmPassword;
+                        });
+                      },
+                    ),
+
+                    if (_isPasswordMismatch)
+                      const Padding(
+                        padding:
+                        EdgeInsets.only(
+                          top: 8,
+                        ),
+                        child: Text(
+                          'Passwords do not match',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+
                     const SizedBox(height: 16),
-                    _buildInput(_instrumentController, 'Musical instruments'),
-                    
+
+                    _buildInput(
+                      _genreController,
+                      'Music genre',
+                    ),
+
                     const SizedBox(height: 16),
-                    
+
+                    _buildInput(
+                      _instrumentController,
+                      'Musical instruments',
+                    ),
+
+                    const SizedBox(height: 16),
+
                     Row(
                       children: [
                         Checkbox(
                           value: _acceptTerms,
-                          activeColor: const Color(0xFFFFD600),
-                          checkColor: Colors.black,
+                          activeColor:
+                          const Color(
+                            0xFFFFD600,
+                          ),
+                          checkColor:
+                          Colors.black,
                           onChanged: (value) {
                             setState(() {
-                              _acceptTerms = value ?? false;
+                              _acceptTerms =
+                                  value ?? false;
                             });
                           },
                         ),
+
                         Expanded(
                           child: RichText(
-                            text: const TextSpan(
-                              style: TextStyle(color: Colors.black, fontSize: 14),
+                            text:
+                            const TextSpan(
+                              style: TextStyle(
+                                color:
+                                Colors.black,
+                                fontSize: 14,
+                              ),
                               children: [
-                                TextSpan(text: 'I accept the '),
                                 TextSpan(
-                                  text: 'Terms of Use',
-                                  style: TextStyle(color: Color(0xFFB8860B), fontWeight: FontWeight.bold), // สีเหลืองทอง
+                                  text:
+                                  'I accept the ',
                                 ),
-                                TextSpan(text: ' & '),
                                 TextSpan(
-                                  text: 'Privacy Policy',
-                                  style: TextStyle(color: Color(0xFFB8860B), fontWeight: FontWeight.bold),
+                                  text:
+                                  'Terms of Use',
+                                  style:
+                                  TextStyle(
+                                    color:
+                                    Color(
+                                      0xFFB8860B,
+                                    ),
+                                    fontWeight:
+                                    FontWeight
+                                        .bold,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: ' & ',
+                                ),
+                                TextSpan(
+                                  text:
+                                  'Privacy Policy',
+                                  style:
+                                  TextStyle(
+                                    color:
+                                    Color(
+                                      0xFFB8860B,
+                                    ),
+                                    fontWeight:
+                                    FontWeight
+                                        .bold,
+                                  ),
                                 ),
                               ],
                             ),
@@ -252,41 +436,110 @@ class _SignupPageState extends State<SignupPage> {
                     ),
 
                     const SizedBox(height: 24),
-                    
-                    SizedBox(
-                      height: 50,
+
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius:
+                        BorderRadius.circular(
+                          8,
+                        ),
+                        boxShadow:
+                        _isFormValid &&
+                            !_isLoading
+                            ? [
+                          BoxShadow(
+                            color:
+                            const Color(
+                              0xFFFFD600,
+                            ).withValues(
+                              alpha: 0.6,
+                            ),
+                            blurRadius:
+                            20,
+                            spreadRadius:
+                            2,
+                          ),
+                        ]
+                            : [],
+                      ),
                       child: ElevatedButton(
-                        onPressed: (_isFormValid && !_isLoading) ? _signUp : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF6C757D), // สีเทาเหมือนเว็บ
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(4),
+                        onPressed:
+                        _isFormValid &&
+                            !_isLoading
+                            ? _signUp
+                            : null,
+                        style:
+                        ElevatedButton.styleFrom(
+                          backgroundColor:
+                          const Color(
+                            0xFFFFD600,
+                          ),
+                          disabledBackgroundColor:
+                          Colors.grey.shade400,
+                          minimumSize:
+                          const Size(
+                            double.infinity,
+                            50,
+                          ),
+                          shape:
+                          RoundedRectangleBorder(
+                            borderRadius:
+                            BorderRadius.circular(
+                              8,
+                            ),
                           ),
                         ),
-                        child: _isLoading 
-                          ? const SizedBox(
-                              height: 20, 
-                              width: 20, 
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                            )
-                          : const Text(
-                              'Register Now',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
+                        child: _isLoading
+                            ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child:
+                          CircularProgressIndicator(
+                            color:
+                            Colors.black,
+                            strokeWidth: 2,
+                          ),
+                        )
+                            : const Text(
+                          'Register Now',
+                          style: TextStyle(
+                            color:
+                            Colors.black,
+                            fontWeight:
+                            FontWeight
+                                .bold,
+                            fontSize: 16,
+                          ),
+                        ),
                       ),
                     ),
-                    
-                    const SizedBox(height: 20),
+
+                    SizedBox(height: 20),
+
                     Center(
-                      child: TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text(
-                          'Already has an account? Login',
-                          style: TextStyle(color: Colors.black, fontSize: 15),
+                      child: RichText(
+                        text: TextSpan(
+                          style: const TextStyle(
+                            color: Colors.black87,
+                            fontSize: 14,
+                          ),
+                          children: [
+                            const TextSpan(
+                              text: 'Already have an account? ',
+                            ),
+                            TextSpan(
+                              text: 'Login',
+                              style: const TextStyle(
+                                color: Color(0xFFD68910),
+                                fontWeight: FontWeight.bold,
+                                decoration: TextDecoration.underline,
+                              ),
+                              recognizer: TapGestureRecognizer()
+                                ..onTap = () {
+                                  Navigator.pop(context);
+                                },
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -295,42 +548,101 @@ class _SignupPageState extends State<SignupPage> {
               ),
             ),
           ),
+
+
+          Positioned(
+            top: 50,
+            left: 16,
+            child: IconButton(
+              icon: const Icon(
+                Icons.arrow_back,
+                color: Colors.white,
+                size: 30,
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+              },
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildInput(
-    TextEditingController controller,
-    String hint, {
-    bool obscure = false,
-    TextInputType inputType = TextInputType.text,
-  }) {
+      TextEditingController controller,
+      String hint, {
+        bool obscure = false,
+        TextInputType inputType =
+            TextInputType.text,
+        VoidCallback? onToggleVisibility,
+      }) {
     return TextField(
       controller: controller,
       obscureText: obscure,
       keyboardType: inputType,
       onChanged: _onFieldChanged,
       cursorColor: Colors.black,
-      style: const TextStyle(color: Colors.black87, fontSize: 16),
+      style: const TextStyle(
+        color: Colors.black87,
+        fontSize: 16,
+      ),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Colors.grey, fontSize: 15),
+        hintStyle: const TextStyle(
+          color: Colors.grey,
+          fontSize: 15,
+        ),
         filled: true,
-        fillColor: Colors.white, // พื้นหลังช่องกรอกสีขาว
+        fillColor: Colors.white,
+
+        suffixIcon:
+        onToggleVisibility != null
+            ? IconButton(
+          icon: Icon(
+            obscure
+                ? Icons.visibility_off
+                : Icons.visibility,
+            color: Colors.grey,
+          ),
+          onPressed:
+          onToggleVisibility,
+        )
+            : null,
+
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4), // ขอบเหลี่ยมๆ เหมือนเว็บ
-          borderSide: const BorderSide(color: Colors.grey),
+          borderRadius:
+          BorderRadius.circular(4),
+          borderSide: const BorderSide(
+            color: Colors.grey,
+          ),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4),
-          borderSide: BorderSide(color: Colors.grey.shade400),
+
+        enabledBorder:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(4),
+          borderSide: BorderSide(
+            color: Colors.grey.shade400,
+          ),
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4),
-          borderSide: const BorderSide(color: Color(0xFF6C757D), width: 1.5),
+
+        focusedBorder:
+        OutlineInputBorder(
+          borderRadius:
+          BorderRadius.circular(4),
+          borderSide:
+          const BorderSide(
+            color: Color(0xFF6C757D),
+            width: 1.5,
+          ),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+
+        contentPadding:
+        const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
       ),
     );
   }

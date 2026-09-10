@@ -1,12 +1,19 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
 import 'package:http/http.dart' as http;
 
 class UploadContent extends StatefulWidget {
   final bool isActive;
-  const UploadContent({super.key, required this.isActive});
+  final VoidCallback? onUploadSuccess;
+
+  const UploadContent({
+    super.key,
+    required this.isActive,
+    this.onUploadSuccess,
+  });
 
   @override
   State<UploadContent> createState() => _UploadContentState();
@@ -71,12 +78,32 @@ class _UploadContentState extends State<UploadContent> {
     }
   }
 
+  void _resetUploadForm() {
+    setState(() {
+      _isFileSelected = false;
+      _acceptTerms = false;
+      _isPublicDomain = false;
+
+      _selectedVideo = null;
+
+      _videoTitleController.clear();
+      _descriptionController.clear();
+      _musicTitleController.clear();
+      _originalWriterController.clear();
+      _instrumentController.clear();
+
+      _videoPlayerController?.dispose();
+      _videoPlayerController = null;
+    });
+  }
+
   Future<void> _uploadVideo() async {
     if (_selectedVideo == null) {
       return;
     }
 
     try {
+      // Upload vd file
       final request = http.MultipartRequest(
         'POST',
         Uri.parse('https://media05.fuzikapp.com/ajax_video.php'),
@@ -91,27 +118,90 @@ class _UploadContentState extends State<UploadContent> {
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
+      final videoLocation = responseBody.trim();
 
-      print('Upload status: ${response.statusCode}');
-      print('Upload response: $responseBody');
+      print('UPLOAD STATUS: ${response.statusCode}');
+      print('UPLOAD RESPONSE: $videoLocation');
 
       if (!mounted) return;
 
-      if (response.statusCode == 200) {
-        print('Upload status: ${response.statusCode}');
-        print('Upload response: $responseBody');
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Video uploaded successfully!'),
-          ),
-        );
-      } else {
+      if (response.statusCode != 200 || videoLocation.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Video upload failed.'),
           ),
         );
+        return;
+      }
+
+      // Get logged-in user's email
+      final user = Supabase.instance.client.auth.currentUser;
+
+      if (user == null || user.email == null) {
+        print('MUSICIAN EMAIL: NOT FOUND');
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('User email not found.'),
+          ),
+        );
+        return;
+      }
+
+      // Get vd dimensions
+      final videoSize = _videoPlayerController?.value.size;
+
+      final double width = videoSize?.width ?? 0;
+      final double height = videoSize?.height ?? 0;
+
+      final String dimension = width >= height ? 'L' : 'P';
+
+      print('VIDEO WIDTH: $width');
+      print('VIDEO HEIGHT: $height');
+      print('VIDEO DIMENSION: $dimension');
+      print('MUSICIAN EMAIL: ${user.email}');
+
+      // 4. Save video information to PlayVideo2
+      final saveUri = Uri.https(
+        'engine01.fuzikapp.com',
+        '/upload_playvideo2',
+        {
+          'video_title': _videoTitleController.text.trim(),
+          'description': _descriptionController.text.trim(),
+          'music_title': _musicTitleController.text.trim(),
+          'video_location': videoLocation,
+          'original': _originalWriterController.text.trim(),
+          'instrument': _instrumentController.text.trim(),
+          'musician2_email': user.email!,
+          'dimension': dimension,
+          'width': width.toInt().toString(),
+          'height': height.toInt().toString(),
+          'accept': _acceptTerms ? '1' : '0',
+          'public_domain': _isPublicDomain ? '1' : '0',
+        },
+      );
+
+      print('SAVE VIDEO URL: $saveUri');
+
+      final saveResponse = await http.get(saveUri);
+
+      print('SAVE VIDEO STATUS: ${saveResponse.statusCode}');
+      print('SAVE VIDEO RESPONSE: ${saveResponse.body}');
+
+      if (!mounted) return;
+
+      // go to Inventory back after upload success
+      if (saveResponse.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Video uploaded successfully!'),
+          ),
+        );
+
+        _resetUploadForm();
+        widget.onUploadSuccess?.call();
+      } else {
+        print('Video information save failed: ${saveResponse.statusCode}');
       }
     } catch (e) {
       print('Upload error: $e');
@@ -212,14 +302,7 @@ class _UploadContentState extends State<UploadContent> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             TextButton.icon(
-              onPressed: () {
-                setState(() {
-                  _isFileSelected = false; // กลับไปหน้าปุ่ม Select Video
-                  _selectedVideo = null;   // ล้างไฟล์ที่เลือก
-                  _videoPlayerController?.dispose(); // ปิดตัวเล่นวิดีโอเพื่อคืนหน่วยความจำ
-                  _videoPlayerController = null;
-                });
-              },
+              onPressed: _resetUploadForm,
               icon: const Icon(Icons.arrow_back, color: Colors.white70),
               label: const Text('Back to select', style: TextStyle(color: Colors.white70)),
             ),
@@ -283,19 +366,94 @@ class _UploadContentState extends State<UploadContent> {
   Widget _buildFormFields() => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      _buildWhiteTextField('Video Title', controller: _videoTitleController),
+      // Video Information
+      const Text(
+        'Video Information',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
       const SizedBox(height: 12),
-      _buildWhiteTextField('Description', controller: _descriptionController, maxLines: 3),
-      const SizedBox(height: 16),
-      _buildCheckbox('I accept the terms.', _acceptTerms, (val) => setState(() => _acceptTerms = val!)),
-      _buildCheckbox('Public domain declaration.', _isPublicDomain, (val) => setState(() => _isPublicDomain = val!)),
+
+      _buildWhiteTextField(
+        'Video Title',
+        controller: _videoTitleController,
+      ),
+
+      const SizedBox(height: 12),
+
+      _buildWhiteTextField(
+        'Description',
+        controller: _descriptionController,
+        maxLines: 3,
+      ),
+
+      const SizedBox(height: 24),
+
+      // Music Information
+      const Text(
+        'Music Information',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+
+      const SizedBox(height: 12),
+
+      _buildWhiteTextField(
+        'Music Title',
+        controller: _musicTitleController,
+      ),
+
+      const SizedBox(height: 12),
+
+      _buildWhiteTextField(
+        'Original Artist',
+        controller: _originalWriterController,
+      ),
+
+      const SizedBox(height: 12),
+
+      _buildWhiteTextField(
+        'Instrument',
+        controller: _instrumentController,
+      ),
+
       const SizedBox(height: 20),
+
+      _buildCheckbox(
+        'I accept the terms.',
+        _acceptTerms,
+            (val) => setState(() => _acceptTerms = val!),
+      ),
+
+      _buildCheckbox(
+        'Public domain declaration.',
+        _isPublicDomain,
+            (val) => setState(() => _isPublicDomain = val!),
+      ),
+
+      const SizedBox(height: 20),
+
       ElevatedButton(
-          onPressed: (_acceptTerms && _isPublicDomain)
-              ? _uploadVideo
-              : null,
-          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFD600), disabledBackgroundColor: Colors.grey),
-          child: const Text('Save information', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold))
+        onPressed: (_acceptTerms && _isPublicDomain)
+            ? _uploadVideo
+            : null,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFFFFD600),
+          disabledBackgroundColor: Colors.grey,
+        ),
+        child: const Text(
+          'Save information',
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
     ],
   );
