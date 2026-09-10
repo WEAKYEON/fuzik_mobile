@@ -41,13 +41,10 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } on AuthException catch (e) {
-      String errorMessage = e.message;
+      String errorMessage = 'Something went wrong. Please try again.';
 
-      final lower = e.message.toLowerCase();
-      if (lower.contains('invalid login credentials')) {
+      if (e.message == 'Invalid login credentials') {
         errorMessage = 'Invalid email or password.';
-      } else if (lower.contains('email not confirmed')) {
-        errorMessage = 'Please confirm your email before logging in.';
       }
 
       if (mounted) {

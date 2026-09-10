@@ -38,7 +38,6 @@ dependencies:
   image_picker: ^1.2.2
   video_player: ^2.11.1
   flutter_dotenv: ^5.1.0
-  url_launcher: ^6.3.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
