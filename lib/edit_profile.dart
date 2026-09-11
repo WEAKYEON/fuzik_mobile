@@ -11,8 +11,7 @@ class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
 
   @override
-  State<EditProfileScreen> createState() =>
-      _EditProfileScreenState();
+  State<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
@@ -45,6 +44,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _loadProfile();
   }
 
+
   String? _getProfileImageUrl(String? path) {
     if (path == null || path.trim().isEmpty) {
       return null;
@@ -71,9 +71,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _loadProfile() async {
-    final user = Supabase.instance.client.auth.currentUser;
+    final user =
+        Supabase.instance.client.auth.currentUser;
 
     if (user == null || user.email == null) {
+      print('LOAD PROFILE: No logged-in user.');
       return;
     }
 
@@ -85,6 +87,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ),
       );
 
+      print(
+        'PROFILE STATUS: ${response.statusCode}',
+      );
+
+      print(
+        'PROFILE RESPONSE: ${response.body}',
+      );
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
@@ -93,6 +103,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
           final profilePic =
           profile['profile_pic']?.toString();
+
+          print(
+            'PROFILE PIC FROM API: $profilePic',
+          );
+
+          print(
+            'PROFILE IMAGE URL: ${_getProfileImageUrl(profilePic)}',
+          );
+
+
 
           if (!mounted) return;
 
@@ -123,7 +143,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Profile not found.'),
+                content: Text(
+                  'Profile not found.',
+                ),
               ),
             );
           }
@@ -141,7 +163,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         }
       }
     } catch (e) {
-      debugPrint('LOAD PROFILE ERROR: $e');
+      print(
+        'LOAD PROFILE ERROR: $e',
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -155,17 +179,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+
   Future<bool> _updateField(
       String field,
       String value,
       ) async {
-    final user = Supabase.instance.client.auth.currentUser;
+    final user =
+        Supabase.instance.client.auth.currentUser;
 
     if (user == null || user.email == null) {
-      debugPrint(
+      print(
         'UPDATE ERROR: No logged-in user/email',
       );
-
       return false;
     }
 
@@ -177,7 +202,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             '&new_value=${Uri.encodeComponent(value)}',
       );
 
+      print(
+        'UPDATE URL: $url',
+      );
+
       final response = await http.get(url);
+
+      print(
+        'UPDATE STATUS: ${response.statusCode}',
+      );
+
+      print(
+        'UPDATE RESPONSE: ${response.body}',
+      );
 
       if (response.statusCode != 200) {
         return false;
@@ -186,18 +223,34 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final data = jsonDecode(response.body);
 
       if (data is List && data.isNotEmpty) {
+        print(
+          'UPDATE RESULT: ${data[0]['result']}',
+        );
+
+        print(
+          'UPDATE DESCRIPTION: '
+              '${data[0]['description']}',
+        );
+
         return data[0]['result'] == 'Success';
       }
 
       return false;
     } catch (e) {
-      debugPrint('UPDATE EXCEPTION: $e');
+      print(
+        'UPDATE EXCEPTION: $e',
+      );
+
       return false;
     }
   }
 
-  MediaType _getImageContentType(String path) {
-    final extension = path.split('.').last.toLowerCase();
+
+  MediaType _getImageContentType(
+      String path,
+      ) {
+    final extension =
+    path.split('.').last.toLowerCase();
 
     switch (extension) {
       case 'jpg':
@@ -222,15 +275,39 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       File imageFile,
       ) async {
     try {
-      final exists = await imageFile.exists();
+      print('Uploading profile image...');
+
+      print(
+        'IMAGE PATH: ${imageFile.path}',
+      );
+
+      final exists =
+      await imageFile.exists();
+
+      print(
+        'IMAGE EXISTS: $exists',
+      );
 
       if (!exists) {
+        print(
+          'IMAGE UPLOAD FAILED: '
+              'File does not exist',
+        );
         return null;
       }
 
-      final fileSize = await imageFile.length();
+      final fileSize =
+      await imageFile.length();
+
+      print(
+        'IMAGE SIZE: $fileSize',
+      );
 
       if (fileSize > 5 * 1024 * 1024) {
+        print(
+          'IMAGE UPLOAD FAILED: '
+              'Image is larger than 5 MB',
+        );
         return null;
       }
 
@@ -238,13 +315,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         '$mediaBaseUrl/ajax.php',
       );
 
-      final request = http.MultipartRequest(
+      final request =
+      http.MultipartRequest(
         'POST',
         uri,
       );
 
       final contentType =
-      _getImageContentType(imageFile.path);
+      _getImageContentType(
+        imageFile.path,
+      );
+
+      print(
+        'IMAGE CONTENT TYPE: $contentType',
+      );
 
       final filename =
           imageFile.path.split('/').last;
@@ -257,41 +341,132 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         contentType: contentType,
       );
 
-      request.files.add(multipartFile);
+      request.files.add(
+        multipartFile,
+      );
+
       request.headers['Accept'] = '*/*';
 
-      final response = await request.send();
+      print(
+        'UPLOAD URL: $uri',
+      );
+
+      print(
+        'UPLOAD FIELD: file',
+      );
+
+      print(
+        'UPLOAD FILENAME: $filename',
+      );
+
+      print(
+        'UPLOAD CONTENT TYPE: '
+            '${multipartFile.contentType}',
+      );
+
+      print(
+        'Sending multipart request...',
+      );
+
+      final response =
+      await request.send();
 
       final responseBody =
-      await response.stream.bytesToString();
+      await response.stream
+          .bytesToString();
+
+      print(
+        'IMAGE UPLOAD STATUS: '
+            '${response.statusCode}',
+      );
+
+      print(
+        'IMAGE UPLOAD RESPONSE: '
+            '$responseBody',
+      );
 
       if (response.statusCode != 200) {
+        print(
+          'IMAGE UPLOAD FAILED: '
+              'HTTP ${response.statusCode}',
+        );
         return null;
       }
 
-      final uploadedPath = responseBody.trim();
+      final uploadedPath =
+      responseBody.trim();
 
-      if (uploadedPath.isEmpty ||
-          uploadedPath.toLowerCase() == 'false' ||
-          uploadedPath.toLowerCase().startsWith('error')) {
+      if (uploadedPath.isEmpty) {
+        print(
+          'IMAGE UPLOAD FAILED: '
+              'Empty response',
+        );
         return null;
       }
+
+      if (uploadedPath.toLowerCase() ==
+          'false') {
+        print(
+          'IMAGE UPLOAD FAILED: '
+              'Server returned false',
+        );
+        return null;
+      }
+
+      if (uploadedPath
+          .toLowerCase()
+          .startsWith('error')) {
+        print(
+          'IMAGE UPLOAD FAILED: '
+              '$uploadedPath',
+        );
+        return null;
+      }
+
+      print(
+        'IMAGE UPLOAD SUCCESS',
+      );
+
+      print(
+        'UPLOADED IMAGE PATH: '
+            '$uploadedPath',
+      );
+
+      print(
+        'UPLOADED IMAGE FULL URL: '
+            '${_getProfileImageUrl(uploadedPath)}',
+      );
 
       return uploadedPath;
     } catch (e) {
-      debugPrint('IMAGE UPLOAD ERROR: $e');
+      print(
+        'IMAGE UPLOAD ERROR: $e',
+      );
+
       return null;
     }
   }
 
   void _updateFormValidity() {
     final isValid =
-        _firstNameController.text.trim().isNotEmpty &&
-            _lastNameController.text.trim().isNotEmpty &&
-            _displayNameController.text.trim().isNotEmpty &&
-            _phoneController.text.trim().isNotEmpty &&
-            _instrumentController.text.trim().isNotEmpty &&
-            _genreController.text.trim().isNotEmpty;
+        _firstNameController.text
+            .trim()
+            .isNotEmpty &&
+            _lastNameController.text
+                .trim()
+                .isNotEmpty &&
+            _displayNameController.text
+                .trim()
+                .isNotEmpty &&
+            _phoneController.text
+                .trim()
+                .isNotEmpty &&
+            _instrumentController.text
+                .trim()
+                .isNotEmpty &&
+            _genreController.text
+                .trim()
+                .isNotEmpty;
 
     if (mounted) {
       setState(() {
@@ -315,18 +490,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final fields = {
         'first_name':
         _firstNameController.text.trim(),
+
         'last_name':
         _lastNameController.text.trim(),
+
         'tel':
         _phoneController.text.trim(),
+
         'music_inst':
         _instrumentController.text.trim(),
+
         'music_genre':
         _genreController.text.trim(),
       };
 
       for (final entry in fields.entries) {
-        final success = await _updateField(
+        final success =
+        await _updateField(
           entry.key,
           entry.value,
         );
@@ -336,6 +516,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         }
       }
 
+
       if (_selectedImage != null) {
         final uploadedPath =
         await _uploadProfileImage(
@@ -343,19 +524,37 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         );
 
         if (uploadedPath != null) {
-          final success = await _updateField(
+          print(
+            'Updating database with '
+                'profile picture: $uploadedPath',
+          );
+
+          final success =
+          await _updateField(
             'profile_pic',
             uploadedPath,
           );
 
           if (success) {
+            print(
+              'PROFILE PICTURE DATABASE '
+                  'UPDATE SUCCESS',
+            );
+
             if (mounted) {
               setState(() {
-                _profilePicturePath = uploadedPath;
+                _profilePicturePath =
+                    uploadedPath;
+
                 _selectedImage = null;
               });
             }
           } else {
+            print(
+              'PROFILE PICTURE DATABASE '
+                  'UPDATE FAILED',
+            );
+
             allSuccess = false;
           }
         } else {
@@ -372,14 +571,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ? 'Profile changes saved.'
                 : 'Some profile changes failed.',
           ),
-          backgroundColor: allSuccess
+          backgroundColor:
+          allSuccess
               ? const Color(0xFF2E7D32)
               : Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
+          behavior:
+          SnackBarBehavior.floating,
         ),
       );
     } catch (e) {
-      debugPrint('SAVE PROFILE ERROR: $e');
+      print(
+        'SAVE PROFILE ERROR: $e',
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -387,8 +590,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             content: Text(
               'Failed to save profile: $e',
             ),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
+            backgroundColor:
+            Colors.redAccent,
+            behavior:
+            SnackBarBehavior.floating,
           ),
         );
       }
@@ -401,21 +606,37 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+
   Future<void> _pickProfileImage() async {
     try {
-      final ImagePicker picker = ImagePicker();
+      final ImagePicker picker =
+      ImagePicker();
 
-      final XFile? image = await picker.pickImage(
+      final XFile? image =
+      await picker.pickImage(
         source: ImageSource.gallery,
       );
 
       if (image != null) {
+        final file = File(image.path);
+
         setState(() {
-          _selectedImage = File(image.path);
+          _selectedImage = file;
         });
+
+        print(
+          'Selected image: ${image.path}',
+        );
+
+        print(
+          'Selected image exists: '
+              '${await file.exists()}',
+        );
       }
     } catch (e) {
-      debugPrint('PROFILE IMAGE ERROR: $e');
+      print(
+        'PROFILE IMAGE ERROR: $e',
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -429,21 +650,31 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+
   Future<void> _takeProfilePhoto() async {
     try {
-      final ImagePicker picker = ImagePicker();
+      final ImagePicker picker =
+      ImagePicker();
 
-      final XFile? image = await picker.pickImage(
+      final XFile? image =
+      await picker.pickImage(
         source: ImageSource.camera,
       );
 
       if (image != null) {
         setState(() {
-          _selectedImage = File(image.path);
+          _selectedImage =
+              File(image.path);
         });
+
+        print(
+          'Taken image: ${image.path}',
+        );
       }
     } catch (e) {
-      debugPrint('CAMERA ERROR: $e');
+      print(
+        'CAMERA ERROR: $e',
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -457,34 +688,45 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+
   void _showProfilePictureOptions() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1E1E1E),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
+      backgroundColor:
+      const Color(0xFF1E1E1E),
+      shape:
+      const RoundedRectangleBorder(
+        borderRadius:
+        BorderRadius.vertical(
           top: Radius.circular(20),
         ),
       ),
       builder: (bottomSheetContext) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(
+            padding:
+            const EdgeInsets.symmetric(
               vertical: 16,
             ),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisSize:
+              MainAxisSize.min,
               children: [
                 const Text(
                   'Profile Picture',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    fontWeight:
+                    FontWeight.bold,
                   ),
                 ),
 
-                const SizedBox(height: 12),
+                const SizedBox(
+                  height: 12,
+                ),
+
+                // TAKE PHOTO
 
                 ListTile(
                   leading: const Icon(
@@ -506,6 +748,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   },
                 ),
 
+                // GALLERY
+
                 ListTile(
                   leading: const Icon(
                     Icons.photo_library,
@@ -525,6 +769,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     _pickProfileImage();
                   },
                 ),
+
+                // REMOVE
 
                 ListTile(
                   leading: const Icon(
@@ -587,6 +833,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
+
   @override
   void dispose() {
     _firstNameController.dispose();
@@ -599,8 +846,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.dispose();
   }
 
+
   @override
   Widget build(BuildContext context) {
+    // NETWORK IMAGE URL
     final profileImageUrl =
     _getProfileImageUrl(
       _profilePicturePath,
@@ -627,19 +876,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           style: TextStyle(
             color: Color(0xFFFFD600),
             fontSize: 20,
-            fontWeight: FontWeight.bold,
+            fontWeight:
+            FontWeight.bold,
           ),
         ),
       ),
 
       body: Stack(
         children: [
+          // BACKGROUND IMAGE
+
           Positioned.fill(
             child: Image.asset(
               'assets/images/background_login.jpg',
               fit: BoxFit.cover,
             ),
           ),
+
+          // DARK OVERLAY
 
           Positioned.fill(
             child: Container(
@@ -649,139 +903,124 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
           ),
 
+          // FORM
+
           Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
+              padding:
+              const EdgeInsets.symmetric(
                 horizontal: 24,
                 vertical: 24,
               ),
 
               child: Container(
-                padding: const EdgeInsets.all(32),
+                padding:
+                const EdgeInsets.all(32),
 
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(
+                decoration:
+                BoxDecoration(
+                  color:
+                  Colors.white.withValues(
                     alpha: 0.7,
                   ),
                   borderRadius:
-                  BorderRadius.circular(12),
+                  BorderRadius.circular(
+                    12,
+                  ),
                 ),
 
                 child: Column(
                   crossAxisAlignment:
-                  CrossAxisAlignment.stretch,
+                  CrossAxisAlignment
+                      .stretch,
 
                   children: [
                     const Text(
                       'Profile',
-                      textAlign: TextAlign.center,
+                      textAlign:
+                      TextAlign.center,
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight:
                         FontWeight.bold,
-                        color: Colors.black87,
+                        color:
+                        Colors.black87,
                       ),
                     ),
 
-                    const SizedBox(height: 18),
+                    const SizedBox(
+                      height: 18,
+                    ),
+
 
                     Center(
-                      child: GestureDetector(
+                      child:
+                      GestureDetector(
                         onTap:
                         _showProfilePictureOptions,
 
                         child: Stack(
                           children: [
-                            Container(
-                              width: 96,
-                              height: 96,
-                              decoration:
-                              const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.grey,
-                              ),
-                              clipBehavior:
-                              Clip.antiAlias,
+                            CircleAvatar(
+                              radius: 48,
 
-                              child:
-                              _selectedImage != null
-                                  ? Image.file(
+                              backgroundColor:
+                              Colors.grey,
+
+
+                              backgroundImage:
+                              _selectedImage !=
+                                  null
+                                  ? FileImage(
                                 _selectedImage!,
-                                width: 96,
-                                height: 96,
-                                fit: BoxFit.cover,
                               )
                                   : profileImageUrl !=
                                   null
-                                  ? Image.network(
+                                  ? NetworkImage(
                                 profileImageUrl,
-                                width: 96,
-                                height: 96,
-                                fit:
-                                BoxFit.cover,
                                 headers:
                                 _mediaHeaders,
-                                loadingBuilder: (
-                                    context,
-                                    child,
-                                    loadingProgress,
-                                    ) {
-                                  if (loadingProgress ==
-                                      null) {
-                                    return child;
-                                  }
-
-                                  return const Center(
-                                    child:
-                                    CircularProgressIndicator(
-                                      strokeWidth:
-                                      2,
-                                    ),
-                                  );
-                                },
-                                errorBuilder: (
-                                    context,
-                                    error,
-                                    stackTrace,
-                                    ) {
-                                  debugPrint(
-                                    'PROFILE IMAGE LOAD ERROR: $error',
-                                  );
-
-                                  return const Icon(
-                                    Icons.person,
-                                    size: 52,
-                                    color:
-                                    Colors.white,
-                                  );
-                                },
                               )
-                                  : const Icon(
+                                  : null,
+
+                              child:
+                              _selectedImage ==
+                                  null &&
+                                  profileImageUrl ==
+                                      null
+                                  ? const Icon(
                                 Icons.person,
                                 size: 52,
                                 color:
                                 Colors.white,
-                              ),
+                              )
+                                  : null,
                             ),
+
 
                             Positioned(
                               bottom: 0,
                               right: 0,
 
-                              child: Container(
+                              child:
+                              Container(
                                 padding:
-                                const EdgeInsets.all(
-                                  8,
-                                ),
+                                const EdgeInsets
+                                    .all(8),
+
                                 decoration:
                                 const BoxDecoration(
-                                  color: Color(
+                                  color:
+                                  Color(
                                     0xFFFFD600,
                                   ),
                                   shape:
-                                  BoxShape.circle,
+                                  BoxShape
+                                      .circle,
                                 ),
-                                child: const Icon(
+
+                                child:
+                                const Icon(
                                   Icons.camera_alt,
                                   size: 18,
                                   color:
@@ -794,7 +1033,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(
+                      height: 16,
+                    ),
 
                     _buildLabel(
                       'First Name',
@@ -805,7 +1046,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       'Enter your first name',
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(
+                      height: 16,
+                    ),
 
                     _buildLabel(
                       'Last Name',
@@ -816,7 +1059,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       'Enter your last name',
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(
+                      height: 16,
+                    ),
 
                     _buildLabel(
                       'Display Name',
@@ -828,7 +1073,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       readOnly: true,
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(
+                      height: 16,
+                    ),
 
                     _buildLabel(
                       'Phone Number',
@@ -845,7 +1092,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ],
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(
+                      height: 16,
+                    ),
 
                     _buildLabel(
                       'Instrument Type',
@@ -856,7 +1105,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       'e.g. Guitar, Piano, Drums',
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(
+                      height: 16,
+                    ),
 
                     _buildLabel(
                       'Music Genre',
@@ -867,14 +1118,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       'e.g. Pop, Rock, Jazz',
                     ),
 
-                    const SizedBox(height: 28),
+                    const SizedBox(
+                      height: 28,
+                    ),
+
+                    // SAVE BUTTON
 
                     Container(
-                      decoration: BoxDecoration(
+                      decoration:
+                      BoxDecoration(
                         borderRadius:
-                        BorderRadius.circular(
+                        BorderRadius
+                            .circular(
                           8,
                         ),
+
                         boxShadow:
                         _isFormValid &&
                             !_isLoading
@@ -886,14 +1144,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             ).withValues(
                               alpha: 0.6,
                             ),
-                            blurRadius: 20,
-                            spreadRadius: 2,
+                            blurRadius:
+                            20,
+                            spreadRadius:
+                            2,
                           ),
                         ]
                             : [],
                       ),
 
-                      child: ElevatedButton(
+                      child:
+                      ElevatedButton(
                         onPressed:
                         _isFormValid &&
                             !_isLoading
@@ -901,22 +1162,28 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             : null,
 
                         style:
-                        ElevatedButton.styleFrom(
+                        ElevatedButton
+                            .styleFrom(
                           backgroundColor:
                           const Color(
                             0xFFFFD600,
                           ),
+
                           disabledBackgroundColor:
-                          Colors.grey.shade400,
+                          Colors.grey
+                              .shade400,
+
                           minimumSize:
                           const Size(
                             double.infinity,
                             50,
                           ),
+
                           shape:
                           RoundedRectangleBorder(
                             borderRadius:
-                            BorderRadius.circular(
+                            BorderRadius
+                                .circular(
                               8,
                             ),
                           ),
@@ -935,11 +1202,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         )
                             : const Text(
                           'Save Changes',
-                          style: TextStyle(
+                          style:
+                          TextStyle(
                             color:
                             Colors.black,
                             fontWeight:
-                            FontWeight.bold,
+                            FontWeight
+                                .bold,
                             fontSize: 16,
                           ),
                         ),
@@ -955,18 +1224,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
+
   Widget _buildLabel(
       String text,
       ) {
     return Padding(
-      padding: const EdgeInsets.only(
+      padding:
+      const EdgeInsets.only(
         bottom: 8,
       ),
       child: Text(
         text,
         style: const TextStyle(
-          fontWeight: FontWeight.bold,
-          color: Colors.black87,
+          fontWeight:
+          FontWeight.bold,
+          color:
+          Colors.black87,
         ),
       ),
     );
@@ -983,39 +1256,61 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }) {
     return TextField(
       controller: controller,
+
       readOnly: readOnly,
-      keyboardType: keyboardType,
-      inputFormatters: inputFormatters,
+
+      keyboardType:
+      keyboardType,
+
+      inputFormatters:
+      inputFormatters,
 
       onChanged: (_) {
         _updateFormValidity();
       },
 
-      cursorColor: Colors.black,
+      cursorColor:
+      Colors.black,
 
       style: const TextStyle(
-        color: Colors.black87,
+        color:
+        Colors.black87,
         fontSize: 16,
-        fontWeight: FontWeight.w500,
+        fontWeight:
+        FontWeight.w500,
       ),
 
-      decoration: InputDecoration(
+      decoration:
+      InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(
+
+        hintStyle:
+        const TextStyle(
           color: Colors.grey,
           fontSize: 16,
         ),
+
         filled: true,
-        fillColor: const Color(
+
+        fillColor:
+        const Color(
           0xFFF4F7FC,
         ),
-        border: OutlineInputBorder(
+
+        border:
+        OutlineInputBorder(
           borderRadius:
-          BorderRadius.circular(8),
-          borderSide: BorderSide.none,
+          BorderRadius.circular(
+            8,
+          ),
+
+          borderSide:
+          BorderSide.none,
         ),
+
         contentPadding:
-        const EdgeInsets.symmetric(
+        const EdgeInsets
+            .symmetric(
           horizontal: 16,
           vertical: 16,
         ),
