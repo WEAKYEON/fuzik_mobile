@@ -17,8 +17,7 @@ class _DashboardContentState extends State<DashboardContent> {
   bool isSoloSelected = true; 
   final _searchController = TextEditingController();
   String _searchQuery = '';
-
-
+  MemoryImage? image;
   Future<Map<String, List<Map<String, dynamic>>>> _fetchVideos({
     String query = '',
   }) async {
@@ -31,11 +30,12 @@ class _DashboardContentState extends State<DashboardContent> {
 
       final pUri = Uri.parse(
         'https://engine01.fuzikapp.com/play2s_p/?q=$encodedQuery',
+    
       );
 
       final responses = await Future.wait([
-        http.get(lUri),
-        http.get(pUri),
+        http.get(lUri, headers:{'Referer': 'https://fuzikapp.com'}),
+        http.get(pUri, headers:{'Referer': 'https://fuzikapp.com'}),
       ]);
 
       final lResponse = responses[0];
@@ -62,6 +62,11 @@ class _DashboardContentState extends State<DashboardContent> {
     }
   }
 
+
+  @override
+  void initState() {
+    super.initState();
+  }
   @override
   void dispose() {
     _searchController.dispose();
@@ -169,11 +174,11 @@ class _DashboardContentState extends State<DashboardContent> {
           ),
           const SizedBox(height: 40),
           
-          Text(isSoloSelected ? 'Portrait' : 'Group', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          isSoloSelected?Text("Portrait", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)):Container(),
           const SizedBox(height: 16),
 
           //Portrait Videos
-          FutureBuilder<Map<String, List<Map<String, dynamic>>>>(
+          isSoloSelected?FutureBuilder<Map<String, List<Map<String, dynamic>>>>(
           future: _fetchVideos(query: _searchQuery), 
           builder: (context,snapshot){
             if (snapshot.connectionState == ConnectionState.waiting) {
@@ -182,7 +187,6 @@ class _DashboardContentState extends State<DashboardContent> {
             if (!snapshot.hasData || snapshot.data!.isEmpty || snapshot.data!['portrait']!.isEmpty) {
               return  Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text('Sorry, we could not find any portrait videos with $_searchQuery.', style: TextStyle(color: Colors.white54, fontSize: 16))));
             }
-            print('Line 185: This is the snapshot data: ${snapshot.data}');
             final videos = snapshot.data!['portrait']!;
             return SizedBox(
               width: MediaQuery.of(context).size.width*0.8,
@@ -203,12 +207,15 @@ class _DashboardContentState extends State<DashboardContent> {
                   final artist = video['musician_name']?.toString() ?? '';
                   final views = '${video['views'] ?? 0} views';
                   final preview = video['preview']?.toString()??'';
-              
+                  final profileUrl = video['musician_profile_pic']?.toString() ?? '';
+                  final sampleurl='https://www.youtube.com/watch?v=8Ju_mYge1Tc';
+                  final description=video['description']?.toString() ??'';
                   return _buildVideoCard(
                     title,
                     artist,
                     views,
                     preview,
+                    profileUrl,
                     isSolo: isSoloSelected,
                     isPortrait: true,
                     onTap: () {
@@ -220,6 +227,9 @@ class _DashboardContentState extends State<DashboardContent> {
                               title: title,
                               artist: artist,
                               views: views,
+                              url: sampleurl,
+                              profileUrl: profileUrl,
+                              description:description
                             ),
                           ),
                         );
@@ -237,8 +247,7 @@ class _DashboardContentState extends State<DashboardContent> {
               ),
             );
           }
-          ),
-
+          ):Container(),
           Text(isSoloSelected ? 'Landscape' : 'Group', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
           // ตารางวิดีโอ (GridView)
@@ -269,12 +278,15 @@ class _DashboardContentState extends State<DashboardContent> {
                   final artist = video['musician_name']?.toString() ?? '';
                   final views = '${video['views'] ?? 0} views';
                   final preview = video['preview']?.toString()??'';
-
+                  final profileUrl = video['musician_profile_pic']?.toString() ?? '';
+                  final sampleurl='https://www.youtube.com/watch?v=8Ju_mYge1Tc';
+                  final description = video['description']?.toString()??'';
                   return _buildVideoCard(
                     title,
                     artist,
                     views,
                     preview,
+                    profileUrl,
                     isPortrait: false,
                     isSolo: isSoloSelected,
                     onTap: () {
@@ -286,6 +298,9 @@ class _DashboardContentState extends State<DashboardContent> {
                               title: title,
                               artist: artist,
                               views: views,
+                              url:sampleurl,
+                              profileUrl: profileUrl,
+                              description: description,
                             ),
                           ),
                         );
@@ -303,6 +318,7 @@ class _DashboardContentState extends State<DashboardContent> {
               );
             },
           ),
+         
         ],
       ),
     );
@@ -312,7 +328,8 @@ class _DashboardContentState extends State<DashboardContent> {
       String title,
       String artist,
       String views,
-      String preview, {
+      String preview,
+      String profileUrl, {
         required bool isPortrait,
         required bool isSolo,
         VoidCallback? onTap,
@@ -374,11 +391,20 @@ class _DashboardContentState extends State<DashboardContent> {
           const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(
-                Icons.music_note,
-                color: Colors.white,
-                size: 16,
-              ),
+              profileUrl.isNotEmpty
+    ? CachedNetworkImage(
+        imageUrl: 'https://media05.fuzikapp.com/$profileUrl',
+        httpHeaders: {
+          'Referer': 'https://fuzikapp.com',
+        },
+        width: 30,
+        height: 30,
+        fit: BoxFit.cover,
+        errorWidget: (context, url, error) {
+          return const Icon(Icons.person);
+        },
+      )
+    : const Icon(Icons.person),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(

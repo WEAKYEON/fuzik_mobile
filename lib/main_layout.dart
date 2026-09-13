@@ -24,6 +24,7 @@ class _MainLayoutState extends State<MainLayout> {
   void initState() {
     super.initState();
     final user = Supabase.instance.client.auth.currentUser;
+    print('Current user: $user'); // Debugging line to check the current user
     if (user != null && user.email != null) {
       _displayName = user.email!.split('@')[0].isNotEmpty 
           ? user.email!.split('@')[0] 

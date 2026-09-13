@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
+import 'youtube_player.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class ViewPlayScreen extends StatelessWidget {
   final String title;
   final String artist;
   final String views;
-
+  final String url;
+  final String profileUrl;
+  final String description;
   const ViewPlayScreen({
     super.key,
     required this.title,
     required this.artist,
     required this.views,
+    required this.url,
+    required this.profileUrl,
+    required this.description
   });
 
   @override
@@ -39,119 +46,7 @@ class ViewPlayScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Video player mockup
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF151515),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFFFFD600).withValues(
-                      alpha: 0.5,
-                    ),
-                  ),
-                ),
-                child: Stack(
-                  children: [
-
-                    // Play button
-                    Center(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white54,
-                        ),
-                        child: IconButton(
-                          iconSize: 42,
-                          icon: const Icon(
-                            Icons.play_arrow,
-                            color: Colors.black,
-                          ),
-                          onPressed: () {
-                            // to Connect real video player here.
-                          },
-                        ),
-                      ),
-                    ),
-
-                    // JAM label
-                    Positioned(
-                      left: 12,
-                      top: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black87,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Text(
-                          'JAM',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // Mock progress bar
-                    Positioned(
-                      left: 12,
-                      right: 12,
-                      bottom: 12,
-                      child: Column(
-                        children: [
-                          Container(
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: Colors.white24,
-                              borderRadius:
-                              BorderRadius.circular(4),
-                            ),
-                            child: FractionallySizedBox(
-                              alignment: Alignment.centerLeft,
-                              widthFactor: 0.55,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white54,
-                                  borderRadius:
-                                  BorderRadius.circular(4),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          const Row(
-                            mainAxisAlignment:
-                            MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                '0:00',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 11,
-                                ),
-                              ),
-                              Text(
-                                '0:00',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+           YouTubeScreen(videourl: url),
 
             const SizedBox(height: 20),
 
@@ -170,11 +65,20 @@ class ViewPlayScreen extends StatelessWidget {
             // user
             Row(
               children: [
-                const Icon(
-                  Icons.person,
-                  color: Color(0xFFFFD600),
-                  size: 18,
-                ),
+                profileUrl.isNotEmpty
+                ? CachedNetworkImage(
+                    imageUrl: 'https://media05.fuzikapp.com/$profileUrl',
+                    httpHeaders: {
+                      'Referer': 'https://fuzikapp.com',
+                    },
+                    width: 30,
+                    height: 30,
+                    fit: BoxFit.cover,
+                    errorWidget: (context, url, error) {
+                      return const Icon(Icons.person);
+                    },
+                  )
+                : const Icon(Icons.person),
                 const SizedBox(width: 6),
                 Text(
                   artist,
@@ -218,7 +122,7 @@ class ViewPlayScreen extends StatelessWidget {
             const SizedBox(height: 20),
 
             const Text(
-              'About this Jam',
+              'Description',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 17,
@@ -228,9 +132,8 @@ class ViewPlayScreen extends StatelessWidget {
 
             const SizedBox(height: 10),
 
-            const Text(
-              'This is a sample jamming video. '
-                  'Video information and playback features...',
+            Text(
+              description,
               style: TextStyle(
                 color: Colors.white60,
                 fontSize: 14,
@@ -302,3 +205,117 @@ class ViewPlayScreen extends StatelessWidget {
     );
   }
 }
+
+//  AspectRatio(
+//               aspectRatio: 16 / 9,
+//               child: Container(
+//                 decoration: BoxDecoration(
+//                   color: const Color(0xFF151515),
+//                   borderRadius: BorderRadius.circular(12),
+//                   border: Border.all(
+//                     color: const Color(0xFFFFD600).withValues(
+//                       alpha: 0.5,
+//                     ),
+//                   ),
+//                 ),
+//                 child: Stack(
+//                   children: [
+
+//                     // Play button
+//                     Center(
+//                       child: Container(
+//                         decoration: BoxDecoration(
+//                           shape: BoxShape.circle,
+//                           color: Colors.white54,
+//                         ),
+//                         child: IconButton(
+//                           iconSize: 42,
+//                           icon: const Icon(
+//                             Icons.play_arrow,
+//                             color: Colors.black,
+//                           ),
+//                           onPressed: () {
+//                             // to Connect real video player here.
+//                           },
+//                         ),
+//                       ),
+//                     ),
+
+//                     // JAM label
+//                     Positioned(
+//                       left: 12,
+//                       top: 12,
+//                       child: Container(
+//                         padding: const EdgeInsets.symmetric(
+//                           horizontal: 10,
+//                           vertical: 5,
+//                         ),
+//                         decoration: BoxDecoration(
+//                           color: Colors.black87,
+//                           borderRadius: BorderRadius.circular(6),
+//                         ),
+//                         child: const Text(
+//                           'JAM',
+//                           style: TextStyle(
+//                             color: Colors.white,
+//                             fontSize: 11,
+//                             fontWeight: FontWeight.bold,
+//                           ),
+//                         ),
+//                       ),
+//                     ),
+
+//                     // Mock progress bar
+//                     Positioned(
+//                       left: 12,
+//                       right: 12,
+//                       bottom: 12,
+//                       child: Column(
+//                         children: [
+//                           Container(
+//                             height: 4,
+//                             decoration: BoxDecoration(
+//                               color: Colors.white24,
+//                               borderRadius:
+//                               BorderRadius.circular(4),
+//                             ),
+//                             child: FractionallySizedBox(
+//                               alignment: Alignment.centerLeft,
+//                               widthFactor: 0.55,
+//                               child: Container(
+//                                 decoration: BoxDecoration(
+//                                   color: Colors.white54,
+//                                   borderRadius:
+//                                   BorderRadius.circular(4),
+//                                 ),
+//                               ),
+//                             ),
+//                           ),
+//                           const SizedBox(height: 6),
+//                           const Row(
+//                             mainAxisAlignment:
+//                             MainAxisAlignment.spaceBetween,
+//                             children: [
+//                               Text(
+//                                 '0:00',
+//                                 style: TextStyle(
+//                                   color: Colors.white70,
+//                                   fontSize: 11,
+//                                 ),
+//                               ),
+//                               Text(
+//                                 '0:00',
+//                                 style: TextStyle(
+//                                   color: Colors.white70,
+//                                   fontSize: 11,
+//                                 ),
+//                               ),
+//                             ],
+//                           ),
+//                         ],
+//                       ),
+//                     ),
+//                   ],
+//                 ),
+//               ),
+//             ),

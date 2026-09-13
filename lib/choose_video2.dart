@@ -69,8 +69,38 @@ class _ChooseVideo2State extends State<ChooseVideo2>{
         _searchController.dispose();
         super.dispose();
       }
+List<SlotOrientation> getOrientationList(String layoutname){
+  late List<SlotOrientation> result;
+  if(layoutname=='4_01'){
+    result=[SlotOrientation.landscape, SlotOrientation.landscape, SlotOrientation.landscape, SlotOrientation.landscape];
+  }
+  if(layoutname=='3_06'){
+    result=[SlotOrientation.landscape,SlotOrientation.portrait,SlotOrientation.portrait];
+  }
+  return result;
+}
+late List orientations;
+Future<bool> orientationChecker(Map<String,dynamic> videoInformation, SlotOrientation slotOrientaion) async{
+   
+    final videoCode=videoInformation['url'];
+  
+    Uri url=Uri.parse('https://engine01.fuzikapp.com/play2_watch?p=$videoCode');
+    final response = await http.get(url);
+    final data=jsonDecode(response.body);
+    final dimension =data[0]['dimension'];
+    final SlotOrientation videoOrientation;
+    if (dimension == 'L') {
+      videoOrientation = SlotOrientation.landscape;
+    } else if (dimension == 'P') {
+      videoOrientation = SlotOrientation.portrait;
+    } else {
+      throw FormatException('Unknown video dimension: $dimension');
+    }
+    bool audit=videoOrientation==slotOrientaion;
+    return audit;
+  }
 
-  Widget buildLayoutPreview(String layoutName, List<dynamic> selectedVideos, int totalVideo, bool isTablet) {
+Widget buildLayoutPreview(String layoutName, List<dynamic> selectedVideos, int totalVideo, bool isTablet) {
   switch (layoutName) {
     case '4_01': 
       return Column(
@@ -276,12 +306,13 @@ class _ChooseVideo2State extends State<ChooseVideo2>{
 Widget _slot(List<dynamic> selectedVideos, int index) {
   final hasVideo = index < selectedVideos.length;
   return GestureDetector(
-    onTap: hasVideo ? () {} : null, // wire up removal in your State class
+    onTap:  () {
+    } , // wire up removal in your State class
     child: Container(
       margin: const EdgeInsets.all(1),
       decoration: BoxDecoration(border: Border.all(color: Colors.black, width: 1)),
       child: hasVideo
-          ? CachedNetworkImage(
+          ?  CachedNetworkImage(
               imageUrl: selectedVideos[index]['preview']?.toString() ?? '',
               fit: BoxFit.cover,
             )
@@ -297,6 +328,7 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
     ),
   );
 }
+   
    @override
   Widget build(BuildContext context){
     //print('Chosen: ${widget.layoutData}');
@@ -308,7 +340,7 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
     final videos=_fetchVideos(query: searchQuery);
     Future<List<Map<String, dynamic>>> landscapeVideos=videos.then((value) => value['landscape'] ?? []);
     Future<List<Map<String, dynamic>>> portraitVideos=videos.then((value) => value['portrait'] ?? []);
-
+    List<SlotOrientation> desiredOrientations= getOrientationList(layoutName);
     print('You are viewing $layoutName');
 
 
@@ -608,8 +640,26 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                       final preview = video['preview']?.toString()??'';
                                   
                                       return GestureDetector(
-                                        onTap: (){
+                                        onTap: ()async{
+                                          int currentSelectVideoIndex=selectedVideos.length;
+                                          SlotOrientation currentOrientation=desiredOrientations[currentSelectVideoIndex];
                                           
+                                          Future<bool> audit=orientationChecker(video, currentOrientation);
+                                          
+                                          bool result=await audit;
+                                          
+                                          if(!result){
+                                            ScaffoldMessenger.of(context).removeCurrentSnackBar();
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Wrong Video Orientation'),
+                                                duration: Duration(seconds: 2),
+                                                behavior: SnackBarBehavior.floating,
+                                                margin: EdgeInsets.all(16),
+                                              ),
+                                            );
+                                            return;
+                                          }
                                           final alreadySelected = selectedVideos.any(
                                             (selected) => selected['url'] == video['url'],
                                           );
