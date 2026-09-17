@@ -1,7 +1,9 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'inventory_video.dart';
 
 class InventoryContent extends StatefulWidget {
@@ -17,10 +19,19 @@ class InventoryContent extends StatefulWidget {
 }
 
 class _InventoryContentState extends State<InventoryContent> {
-  static const String baseUrl = 'https://engine01.fuzikapp.com';
+  static const String baseUrl =
+      'https://engine01.fuzikapp.com';
+
+  static const String mediaBaseUrl =
+      'https://media05.fuzikapp.com';
+
+  static const Map<String, String> _mediaHeaders = {
+    'Referer': 'https://fuzikapp.com',
+  };
 
   List<Map<String, dynamic>> _myVideos = [];
   bool _isLoading = true;
+  String _displayName = '';
 
   @override
   void initState() {
@@ -37,8 +48,34 @@ class _InventoryContentState extends State<InventoryContent> {
     }
   }
 
+  String? _getMediaUrl(String? path) {
+    if (path == null || path.trim().isEmpty) {
+      return null;
+    }
+
+    final cleanPath = path.trim();
+
+    if (cleanPath == 'None' ||
+        cleanPath.toLowerCase() == 'null' ||
+        cleanPath.toLowerCase() == 'false') {
+      return null;
+    }
+
+    if (cleanPath.startsWith('http://') ||
+        cleanPath.startsWith('https://')) {
+      return cleanPath;
+    }
+
+    final normalizedPath = cleanPath.startsWith('/')
+        ? cleanPath.substring(1)
+        : cleanPath;
+
+    return '$mediaBaseUrl/$normalizedPath';
+  }
+
   Future<void> _loadInventory() async {
-    final user = Supabase.instance.client.auth.currentUser;
+    final user =
+        Supabase.instance.client.auth.currentUser;
 
     if (user == null || user.email == null) {
       if (mounted) {
@@ -49,7 +86,14 @@ class _InventoryContentState extends State<InventoryContent> {
       return;
     }
 
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+
     try {
+
       // GET MUSICIAN PROFILE
 
       final profileResponse = await http.get(
@@ -59,30 +103,38 @@ class _InventoryContentState extends State<InventoryContent> {
         ),
       );
 
-      print('PROFILE STATUS: ${profileResponse.statusCode}');
-      print('PROFILE RESPONSE: ${profileResponse.body}');
+      debugPrint(
+        'PROFILE STATUS: ${profileResponse.statusCode}',
+      );
 
       if (profileResponse.statusCode != 200) {
-        throw Exception('Failed to load musician profile');
+        throw Exception(
+          'Failed to load musician profile',
+        );
       }
 
-      final profileData = jsonDecode(profileResponse.body);
+      final profileData =
+      jsonDecode(profileResponse.body);
 
-      if (profileData is! List || profileData.isEmpty) {
-        throw Exception('Musician profile not found');
+      if (profileData is! List ||
+          profileData.isEmpty) {
+        throw Exception(
+          'Musician profile not found',
+        );
       }
 
       final displayName =
-          profileData[0]['display_name']?.toString() ?? '';
+          profileData[0]['display_name']
+              ?.toString() ??
+              '';
 
       if (displayName.isEmpty) {
-        throw Exception('Display name not found');
+        throw Exception(
+          'Display name not found',
+        );
       }
 
-      print('MUSICIAN DISPLAY NAME: $displayName');
-
-
-      //GET LANDSCAPE VIDEOS
+      // GET LANDSCAPE Vd
 
       final landscapeResponse = await http.get(
         Uri.parse(
@@ -91,14 +143,9 @@ class _InventoryContentState extends State<InventoryContent> {
         ),
       );
 
-      print(
-        'LANDSCAPE VIDEO STATUS: '
+      debugPrint(
+        'LANDSCAPE STATUS: '
             '${landscapeResponse.statusCode}',
-      );
-
-      print(
-        'LANDSCAPE VIDEO RESPONSE: '
-            '${landscapeResponse.body}',
       );
 
       if (landscapeResponse.statusCode != 200) {
@@ -110,8 +157,7 @@ class _InventoryContentState extends State<InventoryContent> {
       final landscapeData =
       jsonDecode(landscapeResponse.body);
 
-
-      //GET PORTRAIT VIDEOS
+      // GET PORTRAIT VIDEOS
 
       final portraitResponse = await http.get(
         Uri.parse(
@@ -120,14 +166,9 @@ class _InventoryContentState extends State<InventoryContent> {
         ),
       );
 
-      print(
-        'PORTRAIT VIDEO STATUS: '
+      debugPrint(
+        'PORTRAIT STATUS: '
             '${portraitResponse.statusCode}',
-      );
-
-      print(
-        'PORTRAIT VIDEO RESPONSE: '
-            '${portraitResponse.body}',
       );
 
       if (portraitResponse.statusCode != 200) {
@@ -139,7 +180,7 @@ class _InventoryContentState extends State<InventoryContent> {
       final portraitData =
       jsonDecode(portraitResponse.body);
 
-      //  LANDSCAPE + PORTRAIT
+      // COMBINE VIDEOS
 
       final List<Map<String, dynamic>> allVideos = [];
 
@@ -159,21 +200,22 @@ class _InventoryContentState extends State<InventoryContent> {
         );
       }
 
-      // UPDATE INVENTORY
-
       if (!mounted) return;
 
       setState(() {
+        _displayName = displayName;
         _myVideos = allVideos;
         _isLoading = false;
       });
 
-      print(
+      debugPrint(
         'TOTAL INVENTORY VIDEOS: '
-            '${_myVideos.length}',
+            '${allVideos.length}',
       );
     } catch (e) {
-      print('INVENTORY ERROR: $e');
+      debugPrint(
+        'INVENTORY ERROR: $e',
+      );
 
       if (mounted) {
         setState(() {
@@ -193,89 +235,234 @@ class _InventoryContentState extends State<InventoryContent> {
 
   @override
   Widget build(BuildContext context) {
-    // เช็กความกว้างหน้าจอเพื่อจัด Layout ให้เหมาะกับมือถือ หรือแท็บเล็ต
-    double screenWidth = MediaQuery.of(context).size.width;
-    double paddingHorizontal = screenWidth < 600 ? 16.0 : 40.0;
-    
-    // คำนวณจำนวนคอลัมน์อัตโนมัติ 
-    int columns = screenWidth < 400 ? 1 : (screenWidth < 600 ? 2 : 4);
+    final screenWidth =
+        MediaQuery.of(context).size.width;
+
+    final paddingHorizontal =
+    screenWidth < 600 ? 16.0 : 40.0;
+
+    final columns =
+    screenWidth < 400
+        ? 1
+        : (screenWidth < 600 ? 2 : 4);
+
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFFFFD600),
+        ),
+      );
+    }
 
     return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: paddingHorizontal, vertical: 20),
+      padding: EdgeInsets.symmetric(
+        horizontal: paddingHorizontal,
+        vertical: 20,
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
         children: [
-          const Text('Your Inventory', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text('Manage your uploaded videos and collaborations.', style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14)),
-          const SizedBox(height: 32),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            // ใช้ตัวแปร columns ตรงนี้ เพื่อให้มันเปลี่ยนจำนวนตามจอ
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: columns, 
-              crossAxisSpacing: 16, 
-              mainAxisSpacing: 24, 
-              childAspectRatio: columns == 1 ? 1.4 : 1.05 // ปรับสัดส่วนการ์ดถ้าย่อเหลือคอลัมน์เดียว
+          Text(
+            _displayName.isNotEmpty
+                ? "$_displayName's Inventory"
+                : 'Your Inventory',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
             ),
-            itemCount: _myVideos.length,
-            itemBuilder: (context, index) {
-              final video = _myVideos[index];
-
-              return _buildInventoryCard(video);
-            },
           ),
+
+          const SizedBox(height: 8),
+
+          Text(
+            'Manage your uploaded videos and collaborations.',
+            style: TextStyle(
+              color:
+              Colors.white.withOpacity(0.6),
+              fontSize: 14,
+            ),
+          ),
+
+          const SizedBox(height: 32),
+
+          if (_myVideos.isEmpty)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(40),
+                child: Text(
+                  'No uploaded videos yet.',
+                  style: TextStyle(
+                    color: Colors.white54,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+
+          if (_myVideos.isNotEmpty)
+            GridView.builder(
+              shrinkWrap: true,
+              physics:
+              const NeverScrollableScrollPhysics(),
+
+              gridDelegate:
+              SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: columns,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 24,
+                childAspectRatio:
+                columns == 1 ? 1.4 : 1.05,
+              ),
+
+              itemCount: _myVideos.length,
+
+              itemBuilder: (context, index) {
+                final video =
+                _myVideos[index];
+
+                return _buildInventoryCard(
+                  video,
+                );
+              },
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildInventoryCard(Map<String, dynamic> video) {
-    final title = video['video_title']?.toString() ?? 'Untitled';
-    final views = video['view_count']?.toString() ?? '0';
-    final date = video['created_time']?.toString() ?? '';
-    final preview = video['preview']?.toString() ?? '';
+  Widget _buildInventoryCard(
+      Map<String, dynamic> video,
+      ) {
+    final title =
+        video['video_title']?.toString() ??
+            'Untitled';
+
+    final musicianName =
+        video['musician_name']?.toString().trim() ?? '';
+
+    final artist =
+    musicianName.isNotEmpty
+        ? musicianName
+        : _displayName;
+
+    final views =
+        video['view_count']?.toString() ??
+            '0';
+
+    final date =
+        video['created_time']?.toString() ??
+            '';
+
+    final preview = _getMediaUrl(
+      video['preview']?.toString(),
+    );
+
+    final profileUrl = _getMediaUrl(
+      video['musician_profile_pic']
+          ?.toString(),
+    );
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment:
+      CrossAxisAlignment.start,
       children: [
         Expanded(
           child: GestureDetector(
             onTap: () {
-              print('Clicked video: ${video['url']}');
+              debugPrint(
+                'OPEN VIDEO: '
+                    '$title | '
+                    'id=${video['url']} | '
+                    'youtube=${video['youtube_url']}',
+              );
 
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => InventoryVideoScreen(
-                    videoUrl: video['url']?.toString() ?? '',
-                  ),
+                  builder: (context) =>
+                      InventoryVideoScreen(
+                        videoUrl:
+                        video['url']
+                            ?.toString() ??
+                            '',
+                      ),
                 ),
               );
             },
+
             child: Container(
               clipBehavior: Clip.antiAlias,
+
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(8),
+                color:
+                Colors.white.withOpacity(0.08),
+
+                borderRadius:
+                BorderRadius.circular(8),
+
                 border: Border.all(
-                  color: const Color(0xFFFFD600).withOpacity(0.4),
+                  color:
+                  const Color(0xFFFFD600)
+                      .withOpacity(0.4),
                   width: 1,
                 ),
               ),
+
               child: Stack(
                 children: [
+
+                  // VIDEO PREVIEW IMAGE
+
                   Positioned.fill(
-                    child: preview.isNotEmpty
+                    child: preview != null
                         ? Image.network(
                       preview,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
+                      width: double.infinity,
+                      height: double.infinity,
+
+                      headers:
+                      _mediaHeaders,
+
+                      loadingBuilder: (
+                          context,
+                          child,
+                          loadingProgress,
+                          ) {
+                        if (loadingProgress ==
+                            null) {
+                          return child;
+                        }
+
+                        return const Center(
+                          child:
+                          CircularProgressIndicator(
+                            color:
+                            Color(
+                              0xFFFFD600,
+                            ),
+                          ),
+                        );
+                      },
+
+                      errorBuilder: (
+                          context,
+                          error,
+                          stackTrace,
+                          ) {
+                        debugPrint(
+                          'PREVIEW ERROR: '
+                              '$preview | $error',
+                        );
+
                         return const Center(
                           child: Icon(
-                            Icons.broken_image,
-                            color: Colors.white54,
+                            Icons
+                                .broken_image,
+                            color:
+                            Colors.white54,
                             size: 48,
                           ),
                         );
@@ -283,23 +470,30 @@ class _InventoryContentState extends State<InventoryContent> {
                     )
                         : const Center(
                       child: Icon(
-                        Icons.play_circle_fill,
-                        color: Colors.white30,
+                        Icons
+                            .play_circle_fill,
+                        color:
+                        Colors.white30,
                         size: 48,
                       ),
                     ),
                   ),
 
+                  // EDIT + DELETE
 
-                  // Edit, Delete
                   Positioned(
                     top: 8,
                     right: 8,
+
                     child: Container(
                       decoration: BoxDecoration(
                         color: Colors.black87,
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius:
+                        BorderRadius.circular(
+                          4,
+                        ),
                       ),
+
                       child: Row(
                         children: [
                           IconButton(
@@ -308,30 +502,53 @@ class _InventoryContentState extends State<InventoryContent> {
                               color: Colors.white,
                               size: 16,
                             ),
-                            constraints: const BoxConstraints(),
-                            padding: const EdgeInsets.all(6),
+
+                            constraints:
+                            const BoxConstraints(),
+
+                            padding:
+                            const EdgeInsets.all(
+                              6,
+                            ),
+
                             onPressed: () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => InventoryVideoScreen(
-                                    videoUrl: video['url']?.toString() ?? '',
-                                    autoEdit: true,
-                                  ),
+                                  builder:
+                                      (context) =>
+                                      InventoryVideoScreen(
+                                        videoUrl:
+                                        video['url']
+                                            ?.toString() ??
+                                            '',
+                                        autoEdit: true,
+                                      ),
                                 ),
                               );
                             },
                           ),
+
                           IconButton(
                             icon: const Icon(
                               Icons.delete,
-                              color: Colors.redAccent,
+                              color:
+                              Colors.redAccent,
                               size: 16,
                             ),
-                            constraints: const BoxConstraints(),
-                            padding: const EdgeInsets.all(6),
+
+                            constraints:
+                            const BoxConstraints(),
+
+                            padding:
+                            const EdgeInsets.all(
+                              6,
+                            ),
+
                             onPressed: () {
-                              _showDeleteDialog(video);
+                              _showDeleteDialog(
+                                video,
+                              );
                             },
                           ),
                         ],
@@ -344,26 +561,74 @@ class _InventoryContentState extends State<InventoryContent> {
           ),
         ),
 
-
         const SizedBox(height: 8),
 
+        // PROFILE ICON + TITLE
+
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(
-              Icons.music_note,
-              color: Colors.white,
-              size: 16,
+            Container(
+              width: 30,
+              height: 30,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.grey,
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: profileUrl != null
+                  ? Image.network(
+                profileUrl,
+                width: 30,
+                height: 30,
+                fit: BoxFit.cover,
+                headers: _mediaHeaders,
+                errorBuilder: (
+                    context,
+                    error,
+                    stackTrace,
+                    ) {
+                  return const Icon(
+                    Icons.person,
+                    color: Colors.white,
+                    size: 18,
+                  );
+                },
+              )
+                  : const Icon(
+                Icons.person,
+                color: Colors.white,
+                size: 18,
+              ),
             ),
-            const SizedBox(width: 4),
+
+            const SizedBox(width: 6),
+
             Expanded(
-              child: Text(
-                title,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+
+                  const SizedBox(height: 2),
+
+                  Text(
+                    artist,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white60,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -372,22 +637,42 @@ class _InventoryContentState extends State<InventoryContent> {
         const SizedBox(height: 4),
 
         Padding(
-          padding: const EdgeInsets.only(left: 20.0),
+          padding:
+          const EdgeInsets.only(
+            left: 36.0,
+          ),
+
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                '$views views',
-                style: const TextStyle(
-                  color: Colors.white60,
-                  fontSize: 11,
+              Expanded(
+                child: Text(
+                  '$views views',
+                  overflow:
+                  TextOverflow.ellipsis,
+                  style:
+                  const TextStyle(
+                    color:
+                    Colors.white60,
+                    fontSize: 11,
+                  ),
                 ),
               ),
-              Text(
-                date,
-                style: const TextStyle(
-                  color: Colors.white38,
-                  fontSize: 11,
+
+              const SizedBox(width: 8),
+
+              Flexible(
+                child: Text(
+                  date,
+                  overflow:
+                  TextOverflow.ellipsis,
+                  textAlign:
+                  TextAlign.right,
+                  style:
+                  const TextStyle(
+                    color:
+                    Colors.white38,
+                    fontSize: 11,
+                  ),
                 ),
               ),
             ],
@@ -397,18 +682,22 @@ class _InventoryContentState extends State<InventoryContent> {
     );
   }
 
-  void _showDeleteDialog(Map<String, dynamic> video) {
+  void _showDeleteDialog(
+      Map<String, dynamic> video,
+      ) {
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF1C1C1C),
+          backgroundColor:
+          const Color(0xFF1C1C1C),
 
           title: const Text(
             'Delete Video?',
             style: TextStyle(
               color: Colors.white,
-              fontWeight: FontWeight.bold,
+              fontWeight:
+              FontWeight.bold,
             ),
           ),
 
@@ -424,6 +713,7 @@ class _InventoryContentState extends State<InventoryContent> {
               onPressed: () {
                 Navigator.pop(context);
               },
+
               child: const Text(
                 'Cancel',
                 style: TextStyle(
@@ -434,12 +724,11 @@ class _InventoryContentState extends State<InventoryContent> {
 
             ElevatedButton(
               onPressed: () {
-                // MOCKUP ONLY
-
-
                 Navigator.pop(context);
 
-                ScaffoldMessenger.of(context).showSnackBar(
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(
                   const SnackBar(
                     content: Text(
                       'Delete is not connected yet',
@@ -447,18 +736,21 @@ class _InventoryContentState extends State<InventoryContent> {
                   ),
                 );
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
-                foregroundColor: Colors.white,
+
+              style:
+              ElevatedButton.styleFrom(
+                backgroundColor:
+                Colors.redAccent,
+                foregroundColor:
+                Colors.white,
               ),
-              child: const Text(
-                'Delete',
-              ),
+
+              child:
+              const Text('Delete'),
             ),
           ],
         );
       },
     );
   }
-
 }

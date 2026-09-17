@@ -1,8 +1,7 @@
-
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:video_player/video_player.dart';
+import 'youtube_player.dart';
 
 class InventoryVideoScreen extends StatefulWidget {
   final String videoUrl;
@@ -20,13 +19,21 @@ class InventoryVideoScreen extends StatefulWidget {
 }
 
 class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
-  static const String baseUrl = 'https://engine01.fuzikapp.com';
+  static const String baseUrl =
+      'https://engine01.fuzikapp.com';
+
+  static const String mediaBaseUrl =
+      'https://media05.fuzikapp.com';
+
+  static const Map<String, String> _mediaHeaders = {
+    'Referer': 'https://fuzikapp.com',
+  };
 
   Map<String, dynamic>? video;
 
   bool isLoading = true;
-  VideoPlayerController? _videoController;
-  bool _playerError = false;
+
+  String? _profilePicturePath;
 
   @override
   void initState() {
@@ -34,26 +41,72 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
     _loadVideo();
   }
 
+  String? _getMediaUrl(String? path) {
+    if (path == null || path.trim().isEmpty) {
+      return null;
+    }
+
+    final cleanPath = path.trim();
+
+    if (cleanPath == 'None' ||
+        cleanPath.toLowerCase() == 'null' ||
+        cleanPath.toLowerCase() == 'false') {
+      return null;
+    }
+
+    if (cleanPath.startsWith('http://') ||
+        cleanPath.startsWith('https://')) {
+      return cleanPath;
+    }
+
+    final normalizedPath = cleanPath.startsWith('/')
+        ? cleanPath.substring(1)
+        : cleanPath;
+
+    return '$mediaBaseUrl/$normalizedPath';
+  }
+
+  String _getYoutubeUrl(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return '';
+    }
+
+    final youtubeValue = value.trim();
+
+    if (youtubeValue.startsWith('http://') ||
+        youtubeValue.startsWith('https://')) {
+      return youtubeValue;
+    }
+
+    return 'https://www.youtube.com/watch?v=$youtubeValue';
+  }
 
   Future<void> _loadVideo() async {
     try {
       final response = await http.get(
         Uri.parse(
-          '$baseUrl/play2_watch?p=${Uri.encodeComponent(widget.videoUrl)}',
+          '$baseUrl/play2_watch'
+              '?p=${Uri.encodeComponent(widget.videoUrl)}',
         ),
       );
 
-      print('INVENTORY VIDEO STATUS: ${response.statusCode}');
-      print('INVENTORY VIDEO RESPONSE: ${response.body}');
+      debugPrint(
+        'INVENTORY VIDEO STATUS: ${response.statusCode}',
+      );
 
       if (response.statusCode != 200) {
-        throw Exception('Failed to load video');
+        throw Exception(
+          'Failed to load video',
+        );
       }
 
       final data = jsonDecode(response.body);
 
       if (data is List && data.isNotEmpty) {
-        final loadedVideo = Map<String, dynamic>.from(data[0]);
+        final loadedVideo =
+        Map<String, dynamic>.from(
+          data[0],
+        );
 
         if (!mounted) return;
 
@@ -62,28 +115,45 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
           isLoading = false;
         });
 
-        final videoLocation =
-            loadedVideo['video_location']?.toString() ?? '';
+        final musicianEmail =
+            loadedVideo['musician_email']
+                ?.toString() ??
+                '';
 
-        print('VIDEO LOCATION: $videoLocation');
-
-        if (videoLocation.isNotEmpty) {
-          await _initializeVideo(videoLocation);
+        if (musicianEmail.isNotEmpty) {
+          await _loadMusicianProfile(
+            musicianEmail,
+          );
         }
 
+        final youtubeValue =
+            loadedVideo['youtube_url']
+                ?.toString() ??
+                '';
+
+        debugPrint(
+          'YOUTUBE URL: $youtubeValue',
+        );
+
+        await _addViewCount();
+
         if (widget.autoEdit && mounted) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
+          WidgetsBinding.instance
+              .addPostFrameCallback((_) {
             if (mounted) {
               _showEditDialog();
             }
           });
         }
-
       } else {
-        throw Exception('Video not found');
+        throw Exception(
+          'Video not found',
+        );
       }
     } catch (e) {
-      print('INVENTORY VIDEO ERROR: $e');
+      debugPrint(
+        'INVENTORY VIDEO ERROR: $e',
+      );
 
       if (!mounted) return;
 
@@ -93,18 +163,58 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to load video: $e'),
+          content: Text(
+            'Failed to load video: $e',
+          ),
         ),
+      );
+    }
+  }
+
+  Future<void> _loadMusicianProfile(
+      String email,
+      ) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/musician2_detail'
+              '?email=${Uri.encodeComponent(email)}',
+        ),
+      );
+
+      if (response.statusCode != 200) {
+        return;
+      }
+
+      final data =
+      jsonDecode(response.body);
+
+      if (data is List && data.isNotEmpty) {
+        final profilePic =
+        data[0]['profile_pic']?.toString();
+
+        if (!mounted) return;
+
+        setState(() {
+          _profilePicturePath =
+              profilePic;
+        });
+      }
+    } catch (e) {
+      debugPrint(
+        'PROFILE LOAD ERROR: $e',
       );
     }
   }
 
   Future<void> _addViewCount() async {
     try {
-      final email = video?['musician_email']?.toString() ?? '';
+      final email =
+          video?['musician_email']
+              ?.toString() ??
+              '';
 
       if (email.isEmpty) {
-        print('VIEW ERROR: musician email is empty');
         return;
       }
 
@@ -116,50 +226,15 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
         ),
       );
 
-      print('VIEW STATUS: ${response.statusCode}');
-      print('VIEW RESPONSE: ${response.body}');
-    } catch (e) {
-      print('VIEW ERROR: $e');
-    }
-  }
-
-
-  Future<void> _initializeVideo(String url) async {
-    try {
-      final controller = VideoPlayerController.networkUrl(
-        Uri.parse(url),
+      debugPrint(
+        'VIEW STATUS: ${response.statusCode}',
       );
-
-      _videoController = controller;
-
-      await controller.initialize();
-
-      if (!mounted) return;
-
-      setState(() {
-        _playerError = false;
-      });
-
-
-      await _addViewCount();
-
     } catch (e) {
-      print('VIDEO PLAYER ERROR: $e');
-
-      if (!mounted) return;
-
-      setState(() {
-        _playerError = true;
-      });
+      debugPrint(
+        'VIEW ERROR: $e',
+      );
     }
   }
-
-  @override
-  void dispose() {
-    _videoController?.dispose();
-    super.dispose();
-  }
-
 
   @override
   Widget build(BuildContext context) {
@@ -167,7 +242,7 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
       backgroundColor: Colors.black,
 
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.black,
         elevation: 0,
         leading: const BackButton(
           color: Colors.white,
@@ -200,7 +275,6 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
     );
   }
 
-
   Widget _buildVideoContent() {
     final title =
         video!['video_title']?.toString() ?? '';
@@ -215,16 +289,28 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
         video!['music_title']?.toString() ?? '';
 
     final originalPerformer =
-        video!['original_performer']?.toString() ?? '';
+        video!['original_performer']
+            ?.toString() ??
+            '';
 
     final instrument =
         video!['instrument']?.toString() ?? '';
 
     final views =
-        video!['view_count']?.toString() ?? '';
+        video!['view_count']?.toString() ?? '0';
 
     final createdTime =
         video!['created_time']?.toString() ?? '';
+
+    final profileUrl =
+    _getMediaUrl(
+      _profilePicturePath,
+    );
+
+    final youtubeUrl =
+    _getYoutubeUrl(
+      video!['youtube_url']?.toString(),
+    );
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(
@@ -234,23 +320,51 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
         40,
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
         children: [
+          // YOUTUBE PLAYER
 
           Container(
             width: double.infinity,
             decoration: BoxDecoration(
               color: Colors.black,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius:
+              BorderRadius.circular(10),
               border: Border.all(
-                color: const Color(0xFFFFD600),
+                //color:
+                //const Color(0xFFFFD600),
                 width: 1.5,
               ),
             ),
             clipBehavior: Clip.antiAlias,
-            child: AspectRatio(
+            child: youtubeUrl.isNotEmpty
+                ? YouTubeScreen(
+              videourl: youtubeUrl,
+            )
+                : const AspectRatio(
               aspectRatio: 16 / 9,
-              child: _buildPlayer(),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment:
+                  MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.video_library_outlined,
+                      color: Colors.white54,
+                      size: 44,
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Video unavailable',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
 
@@ -267,14 +381,43 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
 
           const SizedBox(height: 8),
 
+          // PROFILE and CREATOR
+
           Row(
             children: [
-              const CircleAvatar(
-                backgroundColor: Colors.white,
-                radius: 18,
-                child: Icon(
-                  Icons.music_note,
-                  color: Colors.black,
+              Container(
+                width: 36,
+                height: 36,
+                decoration:
+                const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey,
+                ),
+                clipBehavior:
+                Clip.antiAlias,
+                child: profileUrl != null
+                    ? Image.network(
+                  profileUrl,
+                  width: 36,
+                  height: 36,
+                  fit: BoxFit.cover,
+                  headers:
+                  _mediaHeaders,
+                  errorBuilder: (
+                      context,
+                      error,
+                      stackTrace,
+                      ) {
+                    return const Icon(
+                      Icons.person,
+                      color: Colors.white,
+                      size: 20,
+                    );
+                  },
+                )
+                    : const Icon(
+                  Icons.person,
+                  color: Colors.white,
                   size: 20,
                 ),
               ),
@@ -288,9 +431,11 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
                   children: [
                     Text(
                       'Created by $artist',
-                      style: const TextStyle(
+                      style:
+                      const TextStyle(
                         color: Colors.white,
-                        fontWeight: FontWeight.bold,
+                        fontWeight:
+                        FontWeight.bold,
                         fontSize: 14,
                       ),
                     ),
@@ -300,7 +445,8 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
                     Text(
                       '$views views • $createdTime',
                       style: TextStyle(
-                        color: Colors.grey[400],
+                        color:
+                        Colors.grey[400],
                         fontSize: 12,
                       ),
                     ),
@@ -312,11 +458,14 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
 
           const SizedBox(height: 20),
 
+          // EDIT + DELETE
+
           Row(
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: _showEditDialog,
+                  onPressed:
+                  _showEditDialog,
                   icon: const Icon(
                     Icons.edit,
                     size: 18,
@@ -324,13 +473,18 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
                   label: const Text(
                     'Edit Video',
                     style: TextStyle(
-                      fontWeight: FontWeight.bold,
+                      fontWeight:
+                      FontWeight.bold,
                     ),
                   ),
-                  style: ElevatedButton.styleFrom(
+                  style:
+                  ElevatedButton.styleFrom(
                     backgroundColor:
-                    const Color(0xFFFFD600),
-                    foregroundColor: Colors.black,
+                    const Color(
+                      0xFFFFD600,
+                    ),
+                    foregroundColor:
+                    Colors.black,
                     padding:
                     const EdgeInsets.symmetric(
                       vertical: 12,
@@ -338,7 +492,9 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
                     shape:
                     RoundedRectangleBorder(
                       borderRadius:
-                      BorderRadius.circular(10),
+                      BorderRadius.circular(
+                        10,
+                      ),
                     ),
                   ),
                 ),
@@ -348,7 +504,8 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
 
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: _showDeleteDialog,
+                  onPressed:
+                  _showDeleteDialog,
                   icon: const Icon(
                     Icons.delete_outline,
                     size: 18,
@@ -356,12 +513,16 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
                   label: const Text(
                     'Delete',
                     style: TextStyle(
-                      fontWeight: FontWeight.bold,
+                      fontWeight:
+                      FontWeight.bold,
                     ),
                   ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.redAccent,
-                    side: const BorderSide(
+                  style:
+                  OutlinedButton.styleFrom(
+                    foregroundColor:
+                    Colors.redAccent,
+                    side:
+                    const BorderSide(
                       color: Colors.redAccent,
                     ),
                     padding:
@@ -371,7 +532,9 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
                     shape:
                     RoundedRectangleBorder(
                       borderRadius:
-                      BorderRadius.circular(10),
+                      BorderRadius.circular(
+                        10,
+                      ),
                     ),
                   ),
                 ),
@@ -447,126 +610,53 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
     );
   }
 
-  Widget _buildPlayer() {
-    if (_playerError) {
-      return Container(
-        color: Colors.grey[900],
-        child: const Center(
-          child: Column(
-            mainAxisAlignment:
-            MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.video_library_outlined,
-                color: Colors.white54,
-                size: 42,
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Video preview unavailable',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final controller = _videoController;
-
-    if (controller == null ||
-        !controller.value.isInitialized) {
-      return Container(
-        color: Colors.grey[900],
-        child: const Center(
-          child: Icon(
-            Icons.play_circle_fill,
-            color: Colors.white70,
-            size: 60,
-          ),
-        ),
-      );
-    }
-
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-
-        Positioned.fill(
-          child: FittedBox(
-            fit: BoxFit.contain,
-            child: SizedBox(
-              width: controller.value.size.width,
-              height: controller.value.size.height,
-              child: VideoPlayer(controller),
-            ),
-          ),
-        ),
-
-        GestureDetector(
-          onTap: () {
-            setState(() {
-              if (controller.value.isPlaying) {
-                controller.pause();
-              } else {
-                controller.play();
-              }
-            });
-          },
-          child: Container(
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white70,
-            ),
-            padding: const EdgeInsets.all(5),
-            child: Icon(
-              controller.value.isPlaying
-                  ? Icons.pause
-                  : Icons.play_arrow,
-              color: Colors.black,
-              size: 40,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-
   void _showEditDialog() {
-    final titleController = TextEditingController(
-      text: video!['video_title']?.toString() ?? '',
+    final titleController =
+    TextEditingController(
+      text:
+      video!['video_title']
+          ?.toString() ??
+          '',
     );
 
     final descriptionController =
     TextEditingController(
-      text: video!['description']?.toString() ?? '',
+      text:
+      video!['description']
+          ?.toString() ??
+          '',
     );
 
-    final musicController = TextEditingController(
-      text: video!['music_title']?.toString() ?? '',
+    final musicController =
+    TextEditingController(
+      text:
+      video!['music_title']
+          ?.toString() ??
+          '',
     );
 
     final performerController =
     TextEditingController(
       text:
-      video!['original_performer']?.toString() ??
+      video!['original_performer']
+          ?.toString() ??
           '',
     );
 
     final instrumentController =
     TextEditingController(
-      text: video!['instrument']?.toString() ?? '',
+      text:
+      video!['instrument']
+          ?.toString() ??
+          '',
     );
 
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF1C1C1C),
+          backgroundColor:
+          const Color(0xFF1C1C1C),
 
           title: const Text(
             'Edit Video',
@@ -578,11 +668,12 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
 
           content: SingleChildScrollView(
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisSize:
+              MainAxisSize.min,
               children: [
-
                 _buildEditField(
-                  controller: titleController,
+                  controller:
+                  titleController,
                   label: 'Video Title',
                 ),
 
@@ -598,7 +689,8 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
                 const SizedBox(height: 14),
 
                 _buildEditField(
-                  controller: musicController,
+                  controller:
+                  musicController,
                   label: 'Music Title',
                 ),
 
@@ -607,7 +699,8 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
                 _buildEditField(
                   controller:
                   performerController,
-                  label: 'Original Performer',
+                  label:
+                  'Original Performer',
                 ),
 
                 const SizedBox(height: 14),
@@ -622,7 +715,6 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
           ),
 
           actions: [
-
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
@@ -637,9 +729,6 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
 
             ElevatedButton(
               onPressed: () {
-
-                // MOCKUP ONLY
-
                 setState(() {
                   video!['video_title'] =
                       titleController.text;
@@ -668,15 +757,20 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
                   ),
                 );
               },
-              style: ElevatedButton.styleFrom(
+              style:
+              ElevatedButton.styleFrom(
                 backgroundColor:
-                const Color(0xFFFFD600),
-                foregroundColor: Colors.black,
+                const Color(
+                  0xFFFFD600,
+                ),
+                foregroundColor:
+                Colors.black,
               ),
               child: const Text(
                 'Save',
                 style: TextStyle(
-                  fontWeight: FontWeight.bold,
+                  fontWeight:
+                  FontWeight.bold,
                 ),
               ),
             ),
@@ -685,7 +779,6 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
       },
     );
   }
-
 
   Widget _buildEditField({
     required TextEditingController controller,
@@ -700,19 +793,25 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
       ),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(
+        labelStyle:
+        const TextStyle(
           color: Colors.white60,
         ),
-        enabledBorder: OutlineInputBorder(
-          borderSide: const BorderSide(
+        enabledBorder:
+        OutlineInputBorder(
+          borderSide:
+          const BorderSide(
             color: Colors.white24,
           ),
           borderRadius:
           BorderRadius.circular(8),
         ),
-        focusedBorder: OutlineInputBorder(
-          borderSide: const BorderSide(
-            color: Color(0xFFFFD600),
+        focusedBorder:
+        OutlineInputBorder(
+          borderSide:
+          const BorderSide(
+            color:
+            Color(0xFFFFD600),
           ),
           borderRadius:
           BorderRadius.circular(8),
@@ -720,7 +819,6 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
       ),
     );
   }
-
 
   void _showDeleteDialog() {
     showDialog(
@@ -734,7 +832,8 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
             'Delete Video?',
             style: TextStyle(
               color: Colors.white,
-              fontWeight: FontWeight.bold,
+              fontWeight:
+              FontWeight.bold,
             ),
           ),
 
@@ -746,7 +845,6 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
           ),
 
           actions: [
-
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
@@ -761,10 +859,6 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
 
             ElevatedButton(
               onPressed: () {
-
-                // MOCKUP ONLY
-
-
                 Navigator.pop(context);
 
                 ScaffoldMessenger.of(context)
@@ -776,10 +870,12 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
                   ),
                 );
               },
-              style: ElevatedButton.styleFrom(
+              style:
+              ElevatedButton.styleFrom(
                 backgroundColor:
                 Colors.redAccent,
-                foregroundColor: Colors.white,
+                foregroundColor:
+                Colors.white,
               ),
               child: const Text(
                 'Delete',
@@ -791,19 +887,19 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
     );
   }
 
-
   Widget _buildInfoRow(
       String label,
       String value,
       ) {
     return Padding(
       padding:
-      const EdgeInsets.only(bottom: 12),
+      const EdgeInsets.only(
+        bottom: 12,
+      ),
       child: Row(
         crossAxisAlignment:
         CrossAxisAlignment.start,
         children: [
-
           SizedBox(
             width: 130,
             child: Text(

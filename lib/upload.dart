@@ -103,7 +103,6 @@ class _UploadContentState extends State<UploadContent> {
     }
 
     try {
-      // Upload vd file
       final request = http.MultipartRequest(
         'POST',
         Uri.parse('https://media05.fuzikapp.com/ajax_video.php'),
@@ -148,7 +147,7 @@ class _UploadContentState extends State<UploadContent> {
         return;
       }
 
-      // Get vd dimensions
+      // vd dimensions
       final videoSize = _videoPlayerController?.value.size;
 
       final double width = videoSize?.width ?? 0;
@@ -161,7 +160,7 @@ class _UploadContentState extends State<UploadContent> {
       print('VIDEO DIMENSION: $dimension');
       print('MUSICIAN EMAIL: ${user.email}');
 
-      // 4. Save video information to PlayVideo2
+      //save vd info to PlayVideo2
       final saveUri = Uri.https(
         'engine01.fuzikapp.com',
         '/upload_playvideo2',
@@ -190,7 +189,6 @@ class _UploadContentState extends State<UploadContent> {
 
       if (!mounted) return;
 
-      // go to Inventory back after upload success
       if (saveResponse.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
