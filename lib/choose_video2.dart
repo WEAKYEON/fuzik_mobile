@@ -63,23 +63,46 @@ class _ChooseVideo2State extends State<ChooseVideo2>{
    List<Map<String,dynamic>> selectedVideos = [];
    SlotOrientation orientation=SlotOrientation.landscape;
    String searchQuery = '';
-
+   late List orientations;
+    
      @override
       void dispose() {
         _searchController.dispose();
         super.dispose();
       }
+
 List<SlotOrientation> getOrientationList(String layoutname){
   late List<SlotOrientation> result;
   if(layoutname=='4_01'){
     result=[SlotOrientation.landscape, SlotOrientation.landscape, SlotOrientation.landscape, SlotOrientation.landscape];
   }
+  if(layoutname=='3_07'){
+    result=[SlotOrientation.portrait,SlotOrientation.portrait,SlotOrientation.portrait];
+  }
   if(layoutname=='3_06'){
     result=[SlotOrientation.landscape,SlotOrientation.portrait,SlotOrientation.portrait];
   }
+  if(layoutname=='3_05'){
+    result=[SlotOrientation.landscape,SlotOrientation.portrait,SlotOrientation.landscape];
+  }
+  if(layoutname=='2_01'||layoutname=='2_02'|| layoutname=='2_03'||layoutname=='2_04'||layoutname=='2_05'){
+    result=[SlotOrientation.landscape,SlotOrientation.landscape];
+  }
+  if(layoutname=='3_03'||layoutname=='3_02'||layoutname=='3_01'){
+    result=[SlotOrientation.landscape,SlotOrientation.landscape,SlotOrientation.landscape];
+  }
+  if(layoutname=='3_04'){
+    result=[SlotOrientation.portrait,SlotOrientation.landscape,SlotOrientation.landscape];
+  }
+  if(layoutname=='2_06'||layoutname=='2_07'){
+    result=[SlotOrientation.portrait,SlotOrientation.landscape];
+  }
+  if(layoutname=='2_08'){
+    result=[SlotOrientation.portrait,SlotOrientation.portrait];
+  }
   return result;
 }
-late List orientations;
+
 Future<bool> orientationChecker(Map<String,dynamic> videoInformation, SlotOrientation slotOrientaion) async{
    
     final videoCode=videoInformation['url'];
@@ -133,8 +156,7 @@ Widget buildLayoutPreview(String layoutName, List<dynamic> selectedVideos, int t
               bottom: 12,
               width:isTablet?180:90,
               height:isTablet?320:160,             
-              child: _slot(selectedVideos, 2),
-              
+              child: _slot(selectedVideos, 2),        
             ),
 
             Positioned(
@@ -159,8 +181,7 @@ Widget buildLayoutPreview(String layoutName, List<dynamic> selectedVideos, int t
               bottom: 12,
               height:isTablet?180:90,
               width:isTablet?320:160,             
-              child: _slot(selectedVideos, 2),
-              
+              child: _slot(selectedVideos, 2),             
             ),
 
             Positioned(
@@ -172,6 +193,59 @@ Widget buildLayoutPreview(String layoutName, List<dynamic> selectedVideos, int t
             ),
           ],
         );
+
+      case '3_04':
+      return LayoutBuilder(
+        builder:(context, constraints){
+          final waveHeight=constraints.maxHeight/4;
+          return Stack(
+            children: [
+              // Your video layout
+              Positioned(
+                width:3*constraints.maxWidth/10,
+                height:constraints.maxHeight,
+                child:_slot(selectedVideos, 0)
+                ),
+              
+              Positioned(
+                left:3*constraints.maxWidth/10,
+                width: 5*constraints.maxWidth/10,
+                height:constraints.maxHeight,
+                child: Column(
+                  children: [
+                    Expanded(child: _slot(selectedVideos, 1)),
+                    Expanded(child: _slot(selectedVideos, 2))
+                  ],
+                )),
+              Positioned(
+                left:8*constraints.maxWidth/10,
+                width: 2*constraints.maxWidth/10,
+                height: constraints.maxHeight,
+                child: 
+                Column(
+                  children: [
+                    SizedBox(
+                      height: constraints.maxHeight/4,
+                      child: DecorativeWaveform(color:Colors.black,width: 2*constraints.maxWidth/10,)),
+                    SizedBox(
+                      height: constraints.maxHeight/4,
+                      child: DecorativeWaveform(color:Colors.black,width: 2*constraints.maxWidth/10,)),
+                    SizedBox(
+                      height: constraints.maxHeight/4,
+                      child: DecorativeWaveform(color:Colors.black,width: 2*constraints.maxWidth/10,)),
+                    SizedBox(
+                      height: constraints.maxHeight/4,
+                      child: DecorativeWaveform(color:Colors.black,width: 2*constraints.maxWidth/10,)),
+                    
+                
+                  ],
+                )
+                )
+            ],
+          );
+        }
+      );
+        
       case '3_02':
         return Stack(
           children:[
@@ -328,21 +402,20 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
     ),
   );
 }
-   
-   @override
+
+  @override
   Widget build(BuildContext context){
-    //print('Chosen: ${widget.layoutData}');
+
     int totalVideo= widget.layoutData['l_videos_num'] + widget.layoutData['p_videos_num'];
     final layoutName= widget.layoutData['layout_name'];
     final screenSize=MediaQuery.of(context).size.shortestSide;
     final isTablet=screenSize>=600;
     bool isLandscape= orientation==SlotOrientation.landscape ;
-    final videos=_fetchVideos(query: searchQuery);
+    Future<Map<String, List<Map<String, dynamic>>>> videos=_fetchVideos(query: searchQuery); 
     Future<List<Map<String, dynamic>>> landscapeVideos=videos.then((value) => value['landscape'] ?? []);
     Future<List<Map<String, dynamic>>> portraitVideos=videos.then((value) => value['portrait'] ?? []);
     List<SlotOrientation> desiredOrientations= getOrientationList(layoutName);
     print('You are viewing $layoutName');
-
 
     return Scaffold(
       appBar: AppBar(
@@ -620,7 +693,7 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
                                   return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text('ไม่พบข้อมูลวิดีโอ', style: TextStyle(color: Colors.white54, fontSize: 16))));
                                 }
-                                final videos = snapshot.data!;
+                                final videoData = snapshot.data!;
                                 return Padding(
                                   padding: EdgeInsets.fromLTRB(12, 20, 12, 0),
                                   child: GridView.builder(
@@ -633,33 +706,16 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                       mainAxisSpacing: isTablet?10:5, 
                                       childAspectRatio: isLandscape?16/9:9/16, 
                                     ),
-                                    itemCount: videos.length,
+                                    itemCount: videoData.length,
                                     itemBuilder: (context, index) {
-                                      final video = videos[index];
+                                      final video = videoData[index];
                                   
                                       final preview = video['preview']?.toString()??'';
                                   
                                       return GestureDetector(
                                         onTap: ()async{
-                                          int currentSelectVideoIndex=selectedVideos.length;
-                                          SlotOrientation currentOrientation=desiredOrientations[currentSelectVideoIndex];
                                           
-                                          Future<bool> audit=orientationChecker(video, currentOrientation);
                                           
-                                          bool result=await audit;
-                                          
-                                          if(!result){
-                                            ScaffoldMessenger.of(context).removeCurrentSnackBar();
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(
-                                                content: Text('Wrong Video Orientation'),
-                                                duration: Duration(seconds: 2),
-                                                behavior: SnackBarBehavior.floating,
-                                                margin: EdgeInsets.all(16),
-                                              ),
-                                            );
-                                            return;
-                                          }
                                           final alreadySelected = selectedVideos.any(
                                             (selected) => selected['url'] == video['url'],
                                           );
@@ -688,11 +744,28 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                             );
                                             return;
                                           }
-                                          setState(() {
                                           
-                                            selectedVideos.add(video);
-                                            
-                                          });
+                                          int currentSelectVideoIndex=selectedVideos.length;
+                                          SlotOrientation currentOrientation=desiredOrientations[currentSelectVideoIndex];
+                                          
+                                          Future<bool> orientationCheck=orientationChecker(video, currentOrientation);
+                                          
+                                          bool orientationCheckResult=await orientationCheck;
+                                          if(!context.mounted){return;}
+                                          if(!orientationCheckResult){
+                                            ScaffoldMessenger.of(context).removeCurrentSnackBar();
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Wrong Video Orientation'),
+                                                duration: Duration(seconds: 2),
+                                                behavior: SnackBarBehavior.floating,
+                                                margin: EdgeInsets.all(16),
+                                              ),
+                                            );
+                                            return;
+                                          }
+                                          setState(() =>selectedVideos.add(video)                                            
+                                          );
                                         },
                                         child: Container(
                                           decoration: BoxDecoration(
@@ -727,5 +800,97 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
         ),
       ),
     );
+  }
+}
+
+class DecorativeWaveform extends StatelessWidget {
+  final Color color;
+  final double width;
+  final double height;
+
+  const DecorativeWaveform({
+    super.key,
+    this.color = Colors.black,
+    this.width = 120,
+    this.height = 60,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(color: Colors.white),
+      width: width,
+      height: height,
+      child: CustomPaint(
+        painter: DecorativeWaveformPainter(
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+class DecorativeWaveformPainter extends CustomPainter {
+  final Color color;
+
+  DecorativeWaveformPainter({
+    required this.color,
+  });
+
+  final List<double> amplitudes = [
+    0.25,
+    0.45,
+    0.70,
+    0.85,
+    1.00,
+    0.90,
+    0.75,
+    0.60,
+    0.25,
+    0.45,
+    0.70,
+    0.85,
+    1.00,
+    0.90,
+    0.75,
+    0.95,
+    0.82,
+    0.65,
+    0.48,
+    0.35,
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.square;
+
+    final centerY = size.height / 2;
+
+    final spacing = size.width / (amplitudes.length + 1);
+
+    for (int i = 0; i < amplitudes.length; i++) {
+      final x = spacing * (i + 1);
+
+      final lineHeight =
+          size.height * 0.8 * amplitudes[i];
+
+      final top = centerY - lineHeight / 2;
+      final bottom = centerY + lineHeight / 2;
+
+      canvas.drawLine(
+        Offset(x, top),
+        Offset(x, bottom),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(
+    covariant DecorativeWaveformPainter oldDelegate,
+  ) {
+    return oldDelegate.color != color;
   }
 }

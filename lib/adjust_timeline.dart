@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:path_provider/path_provider.dart';
+import 'package:ffmpeg_kit_flutter_new_audio/ffmpeg_kit.dart';
+import 'dart:io';
+import 'package:just_waveform/just_waveform.dart'; 
 
 class AdjustTimelineScreen extends StatefulWidget {
   final String layoutName;
@@ -18,13 +25,203 @@ class AdjustTimelineScreen extends StatefulWidget {
 class _AdjustTimelineScreenState extends State<AdjustTimelineScreen> {
   late List<double> offsets ;
   final List<Color> trackColors = [Colors.redAccent, Colors.blueAccent, Colors.greenAccent, Colors.orangeAccent];
-  
+  late List<AudioPlayer> players;
+  late List<Waveform?> waveforms;
+  bool isMasterPlaying=false;
+
+Future<File> getCachedAudio(String videoCode, String videoUrl) async{
+    final cacheDir= await getTemporaryDirectory();
+    final audioFile=File('${cacheDir.path}/$videoCode.mp3');
+    if(await audioFile.exists()){
+      print('Using cached audio: ${audioFile.path}');
+      return audioFile;
+    }
+
+    final videoFile = File('${cacheDir.path}/$videoCode.mp4',);
+    if(!await videoFile.exists()){
+      final response=await http.get(
+        Uri.parse(videoUrl),
+        headers: {
+          'Referer':"https://fuzikapp.com",
+        },
+      );
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Failed to download video: ${response.statusCode}',
+        );
+      }
+      await videoFile.writeAsBytes(response.bodyBytes);
+    }
+    final session = await FFmpegKit.execute(
+      '-i "${videoFile.path}" -vn -c:a copy "${audioFile.path}"',
+    );
+    final returnCode = await session.getReturnCode();
+
+    if (returnCode?.isValueSuccess() ?? false) {
+      print('getCachedAudio: Audio extracted: ${audioFile.path}');
+
+      // Delete the video and will keep the audio only
+      if (await videoFile.exists()) {
+        await videoFile.delete();
+        print('getCachedAudio: Temporary video deleted.');
+      }
+      return audioFile;
+      }
+    throw Exception('getCachedAudio: FFmpeg failed to extract audio');
+}
+
+//Play a single track
+Future<void> playTrack(int index) async {
+  final player = players[index];
+  final delay = offsets[index] / 50.0;
+
+  if (delay > 0) {
+    await Future.delayed(
+      Duration(
+        milliseconds: (delay * 1000).round(),
+      ),
+    );
+    await player.seek(Duration.zero);
+  } else if (delay < 0) {
+    await player.seek(
+      Duration(
+        milliseconds: (-delay * 1000).round(),
+      ),
+    );
+  } else {
+    await player.seek(Duration.zero);
+  }
+  await player.play();
+}
+
+Future<void> _initializeAudio() async{
+    for(int i=0; i<widget.selectedVideos.length;i++){
+      final videoCode=widget.selectedVideos[i]['url'];
+      final videoPlay2WatchUrl=Uri.parse('https://engine01.fuzikapp.com/play2_watch?p=$videoCode');
+      try{
+        final response= await http.get(videoPlay2WatchUrl);
+        final data= jsonDecode(response.body);
+        
+        final videoLocation=data[0]['video_location_120'];
+
+        //Get Audio File (Extracted audio)
+        final audioFile = await getCachedAudio(
+        videoCode,
+        videoLocation,
+      );
+      print('_initializeAudio: VIDEO $i AUDIO: ${audioFile.path}');
+        try{
+          await players[i].setFilePath(audioFile.path,);
+          await generateWaveform(i, audioFile);
+        }catch(e){
+          debugPrint('_initializeAudio: Failed to load audio $i : $e');
+        }
+      }catch (e, stackTrace) {
+        
+        print('_initializeAudioFunction: INITIALIZATION ERROR PLAYER $i');
+        print(e);
+        print(stackTrace);
+      }
+    }
+  }
+
+  Future<void> togglePlay(int index)async{
+    final player=players[index];
+    await player.setLoopMode(LoopMode.off);
+    if(player.processingState==ProcessingState.completed){
+      await player.seek(Duration.zero);
+    }
+    if(player.playing){
+      await player.pause();
+      return;
+    }
+    await playTrack(index);
+  }
+
+Future<void> playAllTracks() async {
+  setState(() {
+    isMasterPlaying=true;
+  });
+  await Future.wait(
+    List.generate(
+      players.length,
+      (i) => playTrack(i),
+    ),
+  );
+}
+
+Future<void> pauseAllTracks() async {
+  for (final player in players) {
+    await player.pause();
+  }
+  setState(() {
+    isMasterPlaying = false;
+  });
+}
+
+  Future<void> startOver(int index) async {
+  final player = players[index];
+
+  await player.seek(Duration.zero);
+  await player.play();
+}
   @override
   void initState(){
     super.initState();
     offsets = List<double>.filled(widget.selectedVideos.length, 0.0);
+    players = List.generate(widget.selectedVideos.length, 
+    (_)=>AudioPlayer());
+    waveforms = List<Waveform?>.filled(
+      widget.selectedVideos.length,
+      null,
+    );
+    _initializeAudio();
   }
 
+Future<void> generateWaveform(
+  int index,
+  File audioFile,
+) async {
+  try {
+    final cacheDir = await getTemporaryDirectory();
+
+    final waveformFile = File(
+      '${cacheDir.path}/${widget.selectedVideos[index]['url']}.wave',
+    );
+
+    print('Generating waveform for track $index...');
+
+    final progressStream = JustWaveform.extract(
+      audioInFile: audioFile,
+      waveOutFile: waveformFile,
+      zoom: const WaveformZoom.pixelsPerSecond(50),
+    );
+
+    await for (final progress in progressStream) {
+
+      if (progress.waveform != null) {
+        if (!mounted) return;
+
+        setState(() {
+          waveforms[index] = progress.waveform;
+        });
+
+        print('Waveform ready for track ${index+1}');
+      }
+    }
+  } catch (e, stackTrace) {
+    print('WAVEFORM ERROR $index');
+    print(e);
+    print(stackTrace);
+  }
+}
+@override
+void dispose(){
+  for (final player in players){
+    player.dispose();
+  }
+  super.dispose();
+}
   @override
   Widget build(BuildContext context) {
   final isTablet= MediaQuery.of(context).size.shortestSide >= 600;
@@ -37,78 +234,133 @@ class _AdjustTimelineScreenState extends State<AdjustTimelineScreen> {
         title: const Text('Adjust Timeline', style: TextStyle(color: Colors.white)),
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
+        child: SingleChildScrollView(
+          child: Column(
+            children: [   
+            const Divider(color: Colors.white24, thickness: 1),
+             
+              SizedBox(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: widget.selectedVideos.length, // จำนวนวิดีโอ
+                  padding: const EdgeInsets.all(16.0),
+                  itemBuilder: (context, index) {
+                    return _buildTrackTimeline(index, isTablet: isTablet);
+                  },
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // ปุ่ม Generate Preview
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {},
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFFD600),
-                        foregroundColor: Colors.black,
-                        textStyle: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      child: const Text('Generate 20s preview'),
+                  IconButton(
+                    icon: Icon(
+                      isMasterPlaying?
+                      Icons.pause
+                      :Icons.play_arrow,
+                      color: Colors.white,
+                      size: 32,
                     ),
+                    onPressed: isMasterPlaying? pauseAllTracks:playAllTracks,
                   ),
-                  const SizedBox(height: 8),
-                  
-                  Container(
-                    height: 120,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0xFFFFD600)),
-                      color: Colors.black,
-                    ),
-                    alignment: Alignment.center,
-                    child: const Text('Not available', style: TextStyle(color: Colors.white54)),
-                  ),
-                  const SizedBox(height: 8),
 
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        // TODO: บันทึกค่า offsets และส่งข้อมูลไปประมวลผลที่เซิร์ฟเวอร์
-                        for (int i = 0; i < offsets.length; i++) {
-                          print("Track ${i + 1} Offset: ${offsets[i]}");
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFFD600),
-                        foregroundColor: Colors.black,
-                        textStyle: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      child: const Text('Send to Queue'),
+                  const SizedBox(width: 16),
+
+                  IconButton(
+                    icon: const Icon(
+                      Icons.replay,
+                      color: Colors.white,
+                      size: 32,
                     ),
+                    onPressed: (){},
                   ),
                 ],
               ),
-            ),
-            
-            const Divider(color: Colors.white24, thickness: 1),
-
-            Expanded(
-              child: ListView.builder(
-                itemCount: widget.selectedVideos.length, // จำนวนวิดีโอ
+              Padding(
                 padding: const EdgeInsets.all(16.0),
-                itemBuilder: (context, index) {
-                  return _buildTrackTimeline(index, isTablet: isTablet);
-                },
+                child: Column(
+                  children: [
+                    // ปุ่ม Generate Preview
+                    
+                    const SizedBox(height: 8),
+                    
+                    Container(
+                      height: isTablet?200:120,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: const Color(0xFFFFD600)),
+                        color: Colors.black,
+                      ),
+                      alignment: Alignment.center,
+                      child: const Text('Not available', style: TextStyle(color: Colors.white54)),
+                    ),
+                    const SizedBox(height: 10),
+          
+                    SizedBox(
+                      width: isTablet?350:200,
+                      child: Container(
+                        
+                        decoration: BoxDecoration(
+                          
+                          borderRadius: BorderRadius.circular(17),
+                          boxShadow: [BoxShadow(
+                            color: Colors.yellow.withValues(alpha: 0.6),
+                            blurRadius: 20,
+                            spreadRadius: 2
+                          )],
+                        ),
+                        child: ElevatedButton(
+                          onPressed: () {},
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFFD600),
+                            foregroundColor: Colors.black,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15)
+                            ),
+                            textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          child: Text('Generate 20s Preview',style: TextStyle(fontSize: isTablet?17:9),),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 40,),
+                    SizedBox(
+                      width: isTablet?350:200,
+                      child: Container(       
+                        decoration: BoxDecoration(                 
+                          borderRadius: BorderRadius.circular(17),
+                          boxShadow: [BoxShadow(
+                            color: Colors.yellow.withValues(alpha: 0.6),
+                            blurRadius: 20,
+                            spreadRadius: 2
+                          )],
+                        ),
+                        child: ElevatedButton(
+                          onPressed: () {},
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFFD600),
+                            foregroundColor: Colors.black,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15)
+                            ),
+                            textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          child: Text('Send To Queue',style: TextStyle(fontSize: isTablet?17:9),),
+                        ),
+                      ),
+                    ),
+                    
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildTrackTimeline(int index, {required bool isTablet}) {
+//Tracks
+Widget _buildTrackTimeline(int index, {required bool isTablet}) {
     double secondsDelay = offsets[index] / 50.0;
     final video = widget.selectedVideos[index];
     final preview = video['preview']?.toString() ?? '';
@@ -120,9 +372,9 @@ class _AdjustTimelineScreenState extends State<AdjustTimelineScreen> {
         children: [
           Row(
             children: [
-              Container(
-                width: isTablet?150:80,
-                height: isTablet?100:45,
+              Container(             
+                width: isTablet?200:100,
+                height: isTablet?130:100,
                 decoration: BoxDecoration(
                   color: Colors.grey[800],
                   borderRadius: BorderRadius.circular(8),
@@ -141,29 +393,9 @@ class _AdjustTimelineScreenState extends State<AdjustTimelineScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          '${secondsDelay > 0 ? '+' : ''}${secondsDelay.toStringAsFixed(2)}s',
-                          style: TextStyle(color: trackColors[index], fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          icon: const Icon(Icons.chevron_left, color: Colors.white),
-                          onPressed: () => setState(() => offsets[index] -= 5),
-                          constraints: const BoxConstraints(),
-                          padding: EdgeInsets.zero,
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.chevron_right, color: Colors.white),
-                          onPressed: () => setState(() => offsets[index] += 5),
-                          constraints: const BoxConstraints(),
-                          padding: EdgeInsets.zero,
-                        ),
-                      ],
-                    ),
+                    
                     Container(
-                            height: 60,
+                            height: 130,
                             width: double.infinity,
                             decoration: BoxDecoration(
                 color: Colors.white,
@@ -173,48 +405,25 @@ class _AdjustTimelineScreenState extends State<AdjustTimelineScreen> {
                             clipBehavior: Clip.hardEdge,
                             child: GestureDetector(
                 onPanUpdate: (details) {
-                  setState(() {
-                    offsets[index] += details.delta.dx;
+                  setState(() {                   
+                      offsets[index] += details.delta.dx;
+                      if (offsets[index] < 0) {
+                        offsets[index] = 0;
+                      }
                   });
                 },
                 child: Stack(
+                  clipBehavior: Clip.hardEdge,
                   children: [
                     Positioned.fill(
                       child: CustomPaint(
                         painter: RulerPainter(),
                       ),
-                    ),
-                    
-                    Transform.translate(
-                      offset: Offset(offsets[index], 0),
-                      child: Center(
-                        child: Container(
-                          height: 20,
-                          width: 1000,
-                          child: Row(
-                            children: List.generate(
-                              100,
-                              (i) {
-                                final wave = [
-                                  8, 14, 20, 12, 28, 35, 24, 16, 10, 18,
-                                  30, 38, 26, 20, 12, 16, 24, 32, 40, 28,
-                                  18, 10, 14, 26, 34, 42, 30, 20, 14, 22,
-                                  32, 38, 28, 18, 12, 20, 30, 36, 24, 16,
-                                ];
-                
-                                final height = wave[i % wave.length];
-                
-                                return Container(
-                                  margin: const EdgeInsets.symmetric(horizontal: 1),
-                                  width: 2,
-                                  height: height.toDouble(),
-                                  color: trackColors[index],
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                      ),
+                    ),                   
+                    Positioned(
+                      left: offsets[index],
+                      top: 20,
+                      child: _buildWaveform(index),
                     ),
                   ],
                 ),
@@ -226,12 +435,48 @@ class _AdjustTimelineScreenState extends State<AdjustTimelineScreen> {
             ],
           ),
           const SizedBox(height: 8),
-
-          
         ],
       ),
     );
   }
+
+  //Waves
+  Widget _buildWaveform(int index) {
+  final waveform = waveforms[index];
+
+  if (waveform == null) {
+    return const SizedBox(
+      width: 300,
+      height: 80,
+      child: Center(
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+        ),
+      ),
+    );
+  }
+
+  final samples = waveform.data;
+
+  return SizedBox(
+    height: 80,
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        for (final sample in samples)
+          Container(
+  width: 2,
+  height: sample.abs().toDouble().clamp(2, 70),
+  margin: const EdgeInsets.symmetric(horizontal: 1),
+  decoration: BoxDecoration(
+    color: trackColors[index],
+    borderRadius: BorderRadius.circular(10),
+  ),
+)
+      ],
+    ),
+  );
+}
 }
 
 class RulerPainter extends CustomPainter {

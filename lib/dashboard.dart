@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'view_play.dart';
 import 'jam_watch.dart'; 
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart'; //This is a package to cache the images, t
 
 class DashboardContent extends StatefulWidget {
@@ -208,7 +207,8 @@ class _DashboardContentState extends State<DashboardContent> {
                   final views = '${video['views'] ?? 0} views';
                   final preview = video['preview']?.toString()??'';
                   final profileUrl = video['musician_profile_pic']?.toString() ?? '';
-                  final sampleurl='https://www.youtube.com/watch?v=8Ju_mYge1Tc';
+                  final youtubeCode=video['youtube_url'];
+                  final sampleurl='https://www.youtube.com/watch?v=$youtubeCode';
                   final description=video['description']?.toString() ??'';
                   return _buildVideoCard(
                     title,
@@ -279,7 +279,8 @@ class _DashboardContentState extends State<DashboardContent> {
                   final views = '${video['views'] ?? 0} views';
                   final preview = video['preview']?.toString()??'';
                   final profileUrl = video['musician_profile_pic']?.toString() ?? '';
-                  final sampleurl='https://www.youtube.com/watch?v=8Ju_mYge1Tc';
+                  final youtubeCode=video['youtube_url'];
+                  final sampleurl='https://www.youtube.com/watch?v=$youtubeCode';
                   final description = video['description']?.toString()??'';
                   return _buildVideoCard(
                     title,
