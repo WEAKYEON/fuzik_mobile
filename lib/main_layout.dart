@@ -26,6 +26,7 @@ class _MainLayoutState extends State<MainLayout> {
     final user = Supabase.instance.client.auth.currentUser;
     print('Current user: $user'); // Debugging line to check the current user
     if (user != null && user.email != null) {
+      print(user);
       _displayName = user.email!.split('@')[0].isNotEmpty 
           ? user.email!.split('@')[0] 
           : 'Thanat';
@@ -42,19 +43,25 @@ class _MainLayoutState extends State<MainLayout> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
-        title: Text(
-          isMobile ? 'FZ' : 'FUZIK',
-          style: const TextStyle(
-            color: Color(0xFFFFD600),
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 2,
-          ),
+        title: Row(
+          children: [
+            Image.asset('assets/images/FuzikLogo.png', width: 35, height: 35,),
+            SizedBox(width: 10,),
+            Text(
+              isMobile ? 'FZ' : 'FUZIK',
+              style: const TextStyle(
+                color: Colors.yellow,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 2,
+              ),
+            ),
+          ],
         ),
         actions: [
-          _buildStatusBadge(isMobile ? 'PR' : 'PR waiting/∞', const Color(0xFF8AB4F8)),
+          _buildStatusBadge('FuzikPremiumCoin.png'),
           const SizedBox(width: 8),
-          _buildStatusBadge(isMobile ? 'FZ' : 'FZ waiting/200', const Color(0xFFFFD600)),
+          _buildStatusBadge('FuzikNormalCoin.png'),
           const SizedBox(width: 8),
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
@@ -95,12 +102,20 @@ class _MainLayoutState extends State<MainLayout> {
   }
 
 
-  Widget _buildStatusBadge(String text, Color color) {
+  Widget _buildStatusBadge(String imageUrl) {
     return Center(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(20)),
-        child: Text(text, style: const TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold)),
+        decoration: BoxDecoration(
+          color: const Color.fromARGB(255, 42, 41, 41),
+          borderRadius: BorderRadius.circular(25)
+        ),
+        child: Row(
+          children: [
+          Image.asset('assets/images/$imageUrl',width: 35,height: 35,),
+          SizedBox(width: 5,),
+          Text('200',style: TextStyle(fontSize: 15,fontWeight: FontWeight.w900),)
+          ]),
       ),
     );
   }

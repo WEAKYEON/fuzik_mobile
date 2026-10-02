@@ -6,7 +6,7 @@ import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
 import 'package:ffmpeg_kit_flutter_new_audio/ffmpeg_kit.dart';
 import 'dart:io';
-import 'package:just_waveform/just_waveform.dart'; 
+import 'package:just_waveform/just_waveform.dart';
 
 class AdjustTimelineScreen extends StatefulWidget {
   final String layoutName;
@@ -24,7 +24,7 @@ class AdjustTimelineScreen extends StatefulWidget {
 
 class _AdjustTimelineScreenState extends State<AdjustTimelineScreen> {
   late List<double> offsets ;
-  final List<Color> trackColors = [Colors.redAccent, Colors.blueAccent, Colors.greenAccent, Colors.orangeAccent];
+  final List<Color> trackColors = [Colors.cyanAccent, Colors.blueAccent, Colors.greenAccent, Colors.orangeAccent];
   late List<AudioPlayer> players;
   late List<Waveform?> waveforms;
   bool isMasterPlaying=false;
@@ -159,12 +159,19 @@ Future<void> pauseAllTracks() async {
   });
 }
 
-  Future<void> startOver(int index) async {
+Future<void> startOver(int index) async {
   final player = players[index];
 
   await player.seek(Duration.zero);
   await player.play();
 }
+
+Future<void> startOverAllTracks()async{
+  for (final player in players){
+    await player.seek(Duration.zero);
+  }
+}
+
   @override
   void initState(){
     super.initState();
@@ -215,6 +222,7 @@ Future<void> generateWaveform(
     print(stackTrace);
   }
 }
+
 @override
 void dispose(){
   for (final player in players){
@@ -230,7 +238,7 @@ void dispose(){
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: const BackButton(color: Colors.white),
+        leading: const BackButton(color: Colors.yellow),
         title: const Text('Adjust Timeline', style: TextStyle(color: Colors.white)),
       ),
       body: SafeArea(
@@ -238,7 +246,9 @@ void dispose(){
           child: Column(
             children: [   
             const Divider(color: Colors.white24, thickness: 1),
-             
+             Center(
+              child: const Text('Fine-tune your audio clips',style: TextStyle(fontSize: 15, color:Colors.white),),
+             ),
               SizedBox(
                 child: ListView.builder(
                   shrinkWrap: true,
@@ -249,82 +259,108 @@ void dispose(){
                   },
                 ),
               ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      isMasterPlaying?
-                      Icons.pause
-                      :Icons.play_arrow,
-                      color: Colors.white,
-                      size: 32,
-                    ),
-                    onPressed: isMasterPlaying? pauseAllTracks:playAllTracks,
-                  ),
+              // Row(
+              //   mainAxisAlignment: MainAxisAlignment.center,
+              //   children: [
+              //     Container(
+              //       width: 35,
+              //       height: 35,
+              //       decoration: BoxDecoration(
+              //         color: Color.fromARGB(255, 44, 43, 43),
+              //         borderRadius: BorderRadius.circular(25),
+              //         boxShadow: [
+              //           BoxShadow(
+              //             color:  Colors.yellow.withValues(alpha: 0.7),
+              //             blurRadius: 10,
+              //             spreadRadius: 2
+              //           )
+              //         ]
+              //       ),
+              //       child: Center(
+              //         child: IconButton(
+              //           padding: EdgeInsets.zero,
+              //           icon: Icon(
+              //             isMasterPlaying?
+              //             Icons.pause
+              //             :Icons.play_arrow,
+              //             color: Colors.white,
+              //             size: 28,
+              //           ),
+              //           onPressed: isMasterPlaying? pauseAllTracks:playAllTracks,
+              //         ),
+              //       ),
+              //     ),
 
-                  const SizedBox(width: 16),
+              //     const SizedBox(width: 16),
 
-                  IconButton(
-                    icon: const Icon(
-                      Icons.replay,
-                      color: Colors.white,
-                      size: 32,
-                    ),
-                    onPressed: (){},
-                  ),
-                ],
-              ),
+              //     IconButton(
+              //       icon: const Icon(
+              //         Icons.replay,
+              //         color: Colors.white,
+              //         size: 32,
+              //       ),
+              //       onPressed: ()async{
+              //         startOverAllTracks();
+              //       },
+              //     ),
+              //   ],
+              // ),
+              const SizedBox(height: 40,),
               Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: Column(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     // ปุ่ม Generate Preview
-                    
-                    const SizedBox(height: 8),
-                    
                     Container(
-                      height: isTablet?200:120,
-                      width: double.infinity,
+                      height: isTablet?225:117,
+                      width: isTablet?400:208,
                       decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFFFFD600)),
+                        border: Border.all(color: Colors.yellow),
+                        borderRadius: BorderRadius.circular(5),
                         color: Colors.black,
                       ),
                       alignment: Alignment.center,
-                      child: const Text('Not available', style: TextStyle(color: Colors.white54)),
-                    ),
-                    const SizedBox(height: 10),
-          
-                    SizedBox(
-                      width: isTablet?350:200,
-                      child: Container(
-                        
-                        decoration: BoxDecoration(
-                          
-                          borderRadius: BorderRadius.circular(17),
-                          boxShadow: [BoxShadow(
-                            color: Colors.yellow.withValues(alpha: 0.6),
-                            blurRadius: 20,
-                            spreadRadius: 2
-                          )],
-                        ),
-                        child: ElevatedButton(
-                          onPressed: () {},
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFFD600),
-                            foregroundColor: Colors.black,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15)
-                            ),
-                            textStyle: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          child: Text('Generate 20s Preview',style: TextStyle(fontSize: isTablet?17:9),),
-                        ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.music_video,size: 45,),
+                          const SizedBox(height: 20,),
+                          const Text('Preview will be shown here', style: TextStyle(color: Colors.white54)),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 40,),
-                    SizedBox(
-                      width: isTablet?350:200,
+                    SizedBox(width: 50,),
+                    Column(
+                      children: [
+                        SizedBox(
+                          width: 300,
+                          child: Container(         
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(17),
+                              boxShadow: [BoxShadow(
+                                color: Colors.yellow.withValues(alpha: 0.6),
+                                blurRadius: 20,
+                                spreadRadius: 2
+                              )],
+                            ),
+                            child: ElevatedButton(
+                              onPressed: () {},
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.yellow,
+                                foregroundColor: Colors.black,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(15)
+                                ),
+                                textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              child: Text('Generate 20s Preview',style: TextStyle(fontSize: isTablet?17:9),),
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 30,),
+                      SizedBox(
+                      width: isTablet?300:200,
                       child: Container(       
                         decoration: BoxDecoration(                 
                           borderRadius: BorderRadius.circular(17),
@@ -337,7 +373,7 @@ void dispose(){
                         child: ElevatedButton(
                           onPressed: () {},
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFFD600),
+                            backgroundColor: Colors.yellow,
                             foregroundColor: Colors.black,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(15)
@@ -348,7 +384,8 @@ void dispose(){
                         ),
                       ),
                     ),
-                    
+                      ],
+                    ),  
                   ],
                 ),
               ),
@@ -364,7 +401,11 @@ Widget _buildTrackTimeline(int index, {required bool isTablet}) {
     double secondsDelay = offsets[index] / 50.0;
     final video = widget.selectedVideos[index];
     final preview = video['preview']?.toString() ?? '';
+    final duration = players[index].duration;
+   
+      final durationInSeconds = duration?.inSeconds ;
 
+      
     return Padding(
       padding: const EdgeInsets.only(bottom: 24.0),
       child: Column(
@@ -372,19 +413,123 @@ Widget _buildTrackTimeline(int index, {required bool isTablet}) {
         children: [
           Row(
             children: [
-              Container(             
+              Column(
+                children: [
+                  Container(
+                    width: 35,
+                    height: 35,
+                    decoration: BoxDecoration(
+                      color: Colors.yellow,
+                      borderRadius: BorderRadius.circular(25),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.yellow.withValues(alpha: 0.9),
+                          blurRadius: 10,
+                          spreadRadius: 2
+                        )
+                      ]
+                    ),
+                    child: Center(
+                      child: Text('${index+1}', style: TextStyle(color:Colors.black, fontWeight: FontWeight.bold, fontSize: 15),
+                      )
+                    )
+                    ),
+                    SizedBox(width: 10,height: 10,),
+                    durationInSeconds == null
+                      ? const Text(
+                          'Loading',
+                          style: TextStyle(color: Colors.white),
+                        )
+                      : Text(
+                          '${durationInSeconds ~/ 60}:${(durationInSeconds % 60).toString().padLeft(2, '0')}',
+                          style: const TextStyle(color: Colors.white),
+                        )
+                ],
+              ),
+              SizedBox(width: 20,),
+              Container(
+                padding: const EdgeInsets.fromLTRB(5, 5, 5, 0),
                 width: isTablet?200:100,
-                height: isTablet?130:100,
+                height: isTablet?150:100,
                 decoration: BoxDecoration(
-                  color: Colors.grey[800],
+                  color: Colors.grey[850],
                   borderRadius: BorderRadius.circular(8),
+                  
                 ),
                 clipBehavior: Clip.antiAliasWithSaveLayer,
-                child: CachedNetworkImage(
-                  imageUrl: preview,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => const CircularProgressIndicator(),
-                  errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.red),
+                child: Stack(
+                  children: [
+                    Column(
+                      children: [
+                        Container(
+                          width: 180,
+                          height: 95,
+                          clipBehavior: Clip.antiAliasWithSaveLayer,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(6),
+                            
+                          ),
+                          child: CachedNetworkImage(
+                            imageUrl: preview,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => const CircularProgressIndicator(),
+                            errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.red),
+                          ),
+                        ),
+                        SizedBox(
+                          width: double.infinity,          
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              StreamBuilder<PlayerState>(
+                                stream: players[index].playerStateStream,
+                                builder: (context, snapshot) {
+                                  final playerState = snapshot.data;
+                                  final isPlaying = playerState?.playing ?? false;
+                                  return IconButton(
+                                      icon: Icon(
+                                        isPlaying ? Icons.pause : Icons.play_arrow,
+                                        color: Colors.white,
+                                        size: 25,
+                                      ),
+                                      onPressed: () => togglePlay(index),
+                                    );
+                                }
+                              ),
+                              
+                              IconButton(
+                                icon: const Icon(Icons.skip_previous, color: Colors.white, size: 30),
+                                onPressed: () => startOver(index),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.replay, color: Colors.white, size: 25),
+                                onPressed: () {
+                                  setState(() {
+                                    offsets[index] = 0.0;
+                                  });
+                                },
+                              ),
+                            ],),
+                        )
+                      ],
+                    ),
+                    Positioned(
+                      right: 10,
+                      top: 5,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(7),
+                          color: Colors.yellow,
+                        ),
+                        height: 20,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child:Text('${secondsDelay.toStringAsFixed(2)}s',
+                            style: const TextStyle(color: Colors.black, fontSize: 15, fontWeight: FontWeight.w500),
+                          ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 12),
@@ -395,23 +540,22 @@ Widget _buildTrackTimeline(int index, {required bool isTablet}) {
                   children: [
                     
                     Container(
-                            height: 130,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey),
-                            ),
-                            clipBehavior: Clip.hardEdge,
-                            child: GestureDetector(
-                onPanUpdate: (details) {
-                  setState(() {                   
-                      offsets[index] += details.delta.dx;
-                      if (offsets[index] < 0) {
-                        offsets[index] = 0;
-                      }
-                  });
-                },
+                      height: 150,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      clipBehavior: Clip.hardEdge,
+                      child: GestureDetector(
+                      onPanUpdate: (details) {
+                        setState(() {                   
+                            offsets[index] += details.delta.dx;
+                            if (offsets[index] < 0) {
+                              offsets[index] = 0;
+                            }
+                        });
+                      },
                 child: Stack(
                   clipBehavior: Clip.hardEdge,
                   children: [
@@ -419,11 +563,11 @@ Widget _buildTrackTimeline(int index, {required bool isTablet}) {
                       child: CustomPaint(
                         painter: RulerPainter(),
                       ),
-                    ),                   
+                    ),
                     Positioned(
                       left: offsets[index],
-                      top: 20,
-                      child: _buildWaveform(index),
+                      top: (150 - 80) / 2,
+                      child: _TwoSidedWaveformPainter(index)
                     ),
                   ],
                 ),
@@ -441,11 +585,10 @@ Widget _buildTrackTimeline(int index, {required bool isTablet}) {
   }
 
   //Waves
-  Widget _buildWaveform(int index) {
-  final waveform = waveforms[index];
-
-  if (waveform == null) {
-    return const SizedBox(
+  Widget _TwoSidedWaveformPainter(int index){
+    final waveform = waveforms[index];
+    if(waveform==null){
+      return const SizedBox(
       width: 300,
       height: 80,
       child: Center(
@@ -454,43 +597,118 @@ Widget _buildTrackTimeline(int index, {required bool isTablet}) {
         ),
       ),
     );
+    }
+    return SizedBox(
+      width: waveform.data.length.toDouble(),
+      height: 80,
+      child: CustomPaint(
+          painter: TwoSidedWaveformPainter(samples:waveform.data,color:trackColors[index]),
+          ),
+    );
   }
-
-  final samples = waveform.data;
-
-  return SizedBox(
-    height: 80,
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        for (final sample in samples)
-          Container(
-  width: 2,
-  height: sample.abs().toDouble().clamp(2, 70),
-  margin: const EdgeInsets.symmetric(horizontal: 1),
-  decoration: BoxDecoration(
-    color: trackColors[index],
-    borderRadius: BorderRadius.circular(10),
-  ),
-)
-      ],
-    ),
-  );
-}
 }
 
 class RulerPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
+
+    final backgroundPaint = Paint()
+      ..color = Colors.grey[850]!;
+
+    canvas.drawRect(
+      Offset.zero & size,
+      backgroundPaint,
+    );
+    
     final paint = Paint()
       ..color = Colors.grey[300]!
       ..strokeWidth = 1;
 
-    for (double i = 0; i < size.width; i += 20) {
+    for (double i = 0; i < size.width; i += 80) {
       canvas.drawLine(Offset(i, 0), Offset(i, 10), paint);
     }
+    final middleLinePaint = Paint()
+  ..color = Colors.grey[600]!
+  ..strokeWidth = 0.8;
+
+final middleY = size.height / 2;
+
+canvas.drawLine(
+  Offset(0, middleY),
+  Offset(size.width, middleY),
+  middleLinePaint,
+);
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
+
+class TwoSidedWaveformPainter extends CustomPainter {
+  final List<int> samples;
+  final Color color;
+
+  TwoSidedWaveformPainter({
+    required this.samples,
+    required this.color,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (samples.isEmpty) return;
+
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final centerY = size.height / 2;
+
+    // Find the largest amplitude.
+    final maxAmplitude = samples
+        .map((sample) => sample.abs())
+        .reduce((a, b) => a > b ? a : b);
+
+    if (maxAmplitude == 0) return;
+
+    final path = Path();
+
+    // Top half
+    path.moveTo(0, centerY);
+
+    for (int i = 0; i < samples.length; i++) {
+      final normalized =
+          samples[i].abs() / maxAmplitude;
+
+      final amplitude = normalized * (size.height / 2);
+
+      path.lineTo(
+        i.toDouble(),
+        centerY - amplitude,
+      );
+    }
+
+    // Bottom half
+    for (int i = samples.length - 1; i >= 0; i--) {
+      final normalized =
+          samples[i].abs() / maxAmplitude;
+
+      final amplitude = normalized * (size.height / 2);
+
+      path.lineTo(
+        i.toDouble(),
+        centerY + amplitude,
+      );
+    }
+
+    path.close();
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant TwoSidedWaveformPainter oldDelegate) {
+    return oldDelegate.samples != samples ||
+        oldDelegate.color != color;
+  }
+}
+

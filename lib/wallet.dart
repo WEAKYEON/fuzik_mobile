@@ -53,7 +53,7 @@ class _WalletState extends State<Wallet> {
             Row(
               children: [
                 Image.asset(
-                  'assets/images/premium_coin.png',
+                  'assets/images/FuzikPremiumCoin.png',
                   width: 20,
                   height: 20,
                   fit: BoxFit.cover,
@@ -65,7 +65,7 @@ class _WalletState extends State<Wallet> {
             Row(
               children: [
                 Image.asset(
-                  'assets/images/fuzik_coin.png',
+                  'assets/images/FuzikNormalCoin.png',
                   width: 35,
                   height: 35,
                   fit: BoxFit.cover,

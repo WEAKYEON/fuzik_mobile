@@ -32,7 +32,6 @@ class _YouTubeScreenState extends State<YouTubeScreen>{
 
   @override
   Widget build(BuildContext context){
-    bool youtubestyle=false;
     return Container(
       child:
     _startvideo? YoutubePlayer(

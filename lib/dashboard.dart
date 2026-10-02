@@ -276,7 +276,7 @@ class _DashboardContentState extends State<DashboardContent> {
 
                   final title = video['video_title']?.toString() ?? '';
                   final artist = video['musician_name']?.toString() ?? '';
-                  final views = '${video['views'] ?? 0} views';
+                  final views = '${video['view_count'] ?? 0} views';
                   final preview = video['preview']?.toString()??'';
                   final profileUrl = video['musician_profile_pic']?.toString() ?? '';
                   final youtubeCode=video['youtube_url'];
@@ -393,18 +393,21 @@ class _DashboardContentState extends State<DashboardContent> {
           Row(
             children: [
               profileUrl.isNotEmpty
-    ? CachedNetworkImage(
-        imageUrl: 'https://media05.fuzikapp.com/$profileUrl',
-        httpHeaders: {
-          'Referer': 'https://fuzikapp.com',
-        },
-        width: 30,
-        height: 30,
-        fit: BoxFit.cover,
-        errorWidget: (context, url, error) {
-          return const Icon(Icons.person);
-        },
-      )
+    ? ClipRRect(
+      borderRadius: BorderRadius.circular(25),
+      child: CachedNetworkImage(
+          imageUrl: 'https://media05.fuzikapp.com/$profileUrl',
+          httpHeaders: {
+            'Referer': 'https://fuzikapp.com',
+          },
+          width: 30,
+          height: 30,
+          fit: BoxFit.cover,
+          errorWidget: (context, url, error) {
+            return const Icon(Icons.person);
+          },
+        ),
+    )
     : const Icon(Icons.person),
               const SizedBox(width: 4),
               Expanded(

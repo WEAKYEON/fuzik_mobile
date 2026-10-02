@@ -197,7 +197,7 @@ Widget buildLayoutPreview(String layoutName, List<dynamic> selectedVideos, int t
       case '3_04':
       return LayoutBuilder(
         builder:(context, constraints){
-          final waveHeight=constraints.maxHeight/4;
+         
           return Stack(
             children: [
               // Your video layout
@@ -226,16 +226,16 @@ Widget buildLayoutPreview(String layoutName, List<dynamic> selectedVideos, int t
                   children: [
                     SizedBox(
                       height: constraints.maxHeight/4,
-                      child: DecorativeWaveform(color:Colors.black,width: 2*constraints.maxWidth/10,)),
+                      child: DecorativeWaveform(color:Colors.cyanAccent,width: 2*constraints.maxWidth/10,)),
                     SizedBox(
                       height: constraints.maxHeight/4,
-                      child: DecorativeWaveform(color:Colors.black,width: 2*constraints.maxWidth/10,)),
+                      child: DecorativeWaveform(color:Colors.yellowAccent,width: 2*constraints.maxWidth/10,)),
                     SizedBox(
                       height: constraints.maxHeight/4,
-                      child: DecorativeWaveform(color:Colors.black,width: 2*constraints.maxWidth/10,)),
+                      child: DecorativeWaveform(color:Colors.lightBlueAccent,width: 2*constraints.maxWidth/10,)),
                     SizedBox(
                       height: constraints.maxHeight/4,
-                      child: DecorativeWaveform(color:Colors.black,width: 2*constraints.maxWidth/10,)),
+                      child: DecorativeWaveform(color:Colors.lightGreenAccent,width: 2*constraints.maxWidth/10,)),
                     
                 
                   ],
@@ -305,6 +305,51 @@ Widget buildLayoutPreview(String layoutName, List<dynamic> selectedVideos, int t
               
             ),
           ]
+        );
+
+        case '2_06':
+        return LayoutBuilder(
+          builder: (context, constraints){
+            return Stack(
+              children: [
+                SizedBox(
+                  width: constraints.maxWidth/3,
+                  height: constraints.maxHeight,
+                  child: _slot(selectedVideos, 0),
+                ),
+                Positioned(
+                  left:constraints.maxWidth/3,
+                  width: 2*constraints.maxWidth/3,
+                  height: 4*constraints.maxHeight/5,
+                  child: _slot(selectedVideos, 1)
+                  ),
+                Positioned(
+                  left:constraints.maxWidth/3,
+                  top:4*constraints.maxHeight/5,
+                  child:DecorativeWaveform(
+                    width: 2*constraints.maxWidth /9,
+                    height: constraints.maxHeight/5,
+                  ),
+                   ),
+                  Positioned(
+                  left:constraints.maxWidth/3+2*constraints.maxWidth/9,
+                  top:4*constraints.maxHeight/5,
+                  child:DecorativeWaveform(
+                    width: 2*constraints.maxWidth /9,
+                    height: constraints.maxHeight/5,
+                  ),
+                   ),
+                   Positioned(
+                  left:7*constraints.maxWidth/9,
+                  top:4*constraints.maxHeight/5,
+                  child:DecorativeWaveform(
+                    width: 2*constraints.maxWidth /9,
+                    height: constraints.maxHeight/5,
+                  ),
+                   )
+              ],
+            );
+          }
         );
         case '2_02':
         return Stack(
@@ -383,8 +428,7 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
     onTap:  () {
     } , // wire up removal in your State class
     child: Container(
-      margin: const EdgeInsets.all(1),
-      decoration: BoxDecoration(border: Border.all(color: Colors.black, width: 1)),
+      decoration: BoxDecoration(border: Border.all(color: Colors.yellow, width: 2)),
       child: hasVideo
           ?  CachedNetworkImage(
               imageUrl: selectedVideos[index]['preview']?.toString() ?? '',
@@ -392,7 +436,7 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
             )
           : Container(
             decoration: BoxDecoration(
-                color: Colors.black,
+                color: Color(0xFF050505),
                 border: Border.all(color: Colors.yellow, width: 1),
               ),
             child: Center(
@@ -419,7 +463,7 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: const Color(0xFF050505),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.yellow),
@@ -465,7 +509,7 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                         backgroundColor: Colors.yellow,
                         foregroundColor: Colors.black,
                         disabledBackgroundColor: const Color.fromARGB(255, 99, 94, 45), 
-                        disabledForegroundColor: Colors.grey[600], 
+                        disabledForegroundColor: Colors.black, 
                          
                       ),
                       onPressed: selectedVideos.length==totalVideo?(){
@@ -493,9 +537,19 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                   maxChildSize: 0.9,
                   builder: (context, scrollController){
                     return Container(
-                      decoration: const BoxDecoration(
-                        color: Color.fromARGB(255, 71, 71, 71),
+                      margin: const EdgeInsets.fromLTRB(25, 0, 25, 0),
+                      decoration:  BoxDecoration(
+                        color: Color(0xFF242424),
                         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                        //border:Border(top: BorderSide(color: Colors.yellow, width: 2), ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.yellow.withValues(alpha: 0.3),
+                            spreadRadius: 2,
+                            blurRadius: 15,
+                            offset: Offset(0, 3), // changes position of shadow
+                          ),
+                        ],
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -505,7 +559,7 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                             children: [
                               Expanded(
                                 child: Container(
-                                  margin: const EdgeInsets.fromLTRB(12, 20, 8, 15),
+                                  margin: const EdgeInsets.fromLTRB(15, 30, 8, 15),
                                   child: TextField(
                                     controller: _searchController,
                                     style: const TextStyle(color: Colors.white),
@@ -517,7 +571,7 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                         color: Colors.grey,
                                       ),
                                       filled: true,
-                                      fillColor: Colors.black26,
+                                      fillColor: Colors.grey[800],
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(10),
                                         borderSide: BorderSide.none,
@@ -565,7 +619,7 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                               child: SingleChildScrollView(
                                 scrollDirection: Axis.horizontal,
                                 child: Padding(
-                                  padding: const EdgeInsets.fromLTRB(6,0,6,0),
+                                  padding: const EdgeInsets.fromLTRB(15,0,15,0),
                                   child: Row(
                                     
                                     children: [
@@ -621,7 +675,7 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                           Align(
                             alignment: Alignment.centerLeft,
                             child: Padding(
-                              padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                              padding: const EdgeInsets.fromLTRB(15, 10, 15, 0),
                               child: CupertinoSlidingSegmentedControl<SlotOrientation>(
                                 groupValue: orientation,
                                 backgroundColor: Colors.black26,
@@ -695,16 +749,16 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                 }
                                 final videoData = snapshot.data!;
                                 return Padding(
-                                  padding: EdgeInsets.fromLTRB(12, 20, 12, 0),
+                                  padding: EdgeInsets.fromLTRB(15, 20, 15, 0),
                                   child: GridView.builder(
                                     controller: scrollController,
                                     shrinkWrap: true,
                                     //physics: const NeverScrollableScrollPhysics(),
                                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: isTablet?3: orientation==SlotOrientation.portrait?3:2, 
+                                      crossAxisCount: isTablet?orientation==SlotOrientation.portrait?5:3: orientation==SlotOrientation.portrait?3:2, 
                                       crossAxisSpacing: isTablet?10:5, 
                                       mainAxisSpacing: isTablet?10:5, 
-                                      childAspectRatio: isLandscape?16/9:9/16, 
+                                      childAspectRatio: isLandscape?4/3:1/2, 
                                     ),
                                     itemCount: videoData.length,
                                     itemBuilder: (context, index) {
@@ -714,8 +768,6 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                   
                                       return GestureDetector(
                                         onTap: ()async{
-                                          
-                                          
                                           final alreadySelected = selectedVideos.any(
                                             (selected) => selected['url'] == video['url'],
                                           );
@@ -768,21 +820,34 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                           );
                                         },
                                         child: Container(
-                                          decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: Colors.yellow, width: 0.7),
-                                          ),
-                                          child: ClipRRect(
-                                            borderRadius: BorderRadiusGeometry.circular(8),
-                                            child: CachedNetworkImage(
-                                              imageUrl: preview,
-                                              fit:BoxFit.cover,
-                                              width: double.infinity,
-                                              height: double.infinity,
-                                              placeholder: (context, url) => Center(child: CircularProgressIndicator(color:Colors.yellow)),
-                                              errorWidget: (context, url, error) => Icon(Icons.error),
-                                                                              ),
-                                          ),
+                                          padding:const EdgeInsets.only(left: 2, right: 2),
+                                          width: double.infinity,
+                                            child: Column(
+                                              children: [
+                                                AspectRatio(
+                                                  aspectRatio: isLandscape?16/9:9/16,
+                                                  child: Container(
+                                                    decoration: BoxDecoration(
+                                                      border: Border.all(color: Colors.yellow, width: 1.5),
+                                                      borderRadius: BorderRadiusGeometry.circular(8),
+                                                    ),
+                                                    child: ClipRRect(
+                                                      borderRadius: BorderRadius.circular(8),
+                                                      child: CachedNetworkImage(
+                                                        imageUrl: preview,
+                                                        fit:BoxFit.cover,
+                                                        width: double.infinity,
+                                                        placeholder: (context, url) => Center(child: CircularProgressIndicator(color:Colors.yellow)),
+                                                        errorWidget: (context, url, error) => Icon(Icons.error),
+                                                        ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(height: 5),
+                                                Text('${video['video_title']}', style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis, maxLines: 2,),
+                                              ],
+                                            ),
+                                          
                                         ),
                                       );
                                     },
@@ -818,7 +883,7 @@ class DecorativeWaveform extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(color: Colors.white),
+      decoration: BoxDecoration(color: const Color.fromARGB(255, 56, 55, 55)),
       width: width,
       height: height,
       child: CustomPaint(
@@ -841,18 +906,38 @@ class DecorativeWaveformPainter extends CustomPainter {
     0.45,
     0.70,
     0.85,
-    1.00,
-    0.90,
+    0.69,
+    0.70,
     0.75,
     0.60,
     0.25,
     0.45,
     0.70,
+    0.65,
+    1.00,
+    0.60,
+    0.75,
+    0.65,
+    0.82,
+    0.65,
+    0.48,
+    0.35,
+    0.25,
+    0.45,
+    0.70,
     0.85,
     1.00,
-    0.90,
+    0.70,
     0.75,
-    0.95,
+    0.60,
+    0.25,
+    0.45,
+    0.70,
+    0.65,
+    1.00,
+    0.60,
+    0.75,
+    0.65,
     0.82,
     0.65,
     0.48,
