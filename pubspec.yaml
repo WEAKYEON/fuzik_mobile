@@ -43,6 +43,7 @@ dependencies:
 
   cached_network_image: ^4.0.0
   youtube_player_iframe: ^6.0.2
+  share_plus: ^13.3.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -31,6 +31,7 @@ class _InventoryContentState extends State<InventoryContent> {
 
   List<Map<String, dynamic>> _myVideos = [];
   bool _isLoading = true;
+  bool _isLoadingInventory = false;
   String _displayName = '';
 
   @override
@@ -74,37 +75,70 @@ class _InventoryContentState extends State<InventoryContent> {
   }
 
   Future<void> _loadInventory() async {
-    final user =
-        Supabase.instance.client.auth.currentUser;
-
-    if (user == null || user.email == null) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+    if (_isLoadingInventory) {
       return;
     }
 
-    if (mounted) {
-      setState(() {
-        _isLoading = true;
-      });
-    }
+    _isLoadingInventory = true;
 
     try {
+      final user =
+          Supabase.instance.client.auth.currentUser;
 
-      // GET MUSICIAN PROFILE
+      if (user == null || user.email == null) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+        return;
+      }
 
-      final profileResponse = await http.get(
-        Uri.parse(
-          '$baseUrl/musician2_detail'
-              '?email=${Uri.encodeComponent(user.email!)}',
+      if (mounted) {
+        setState(() {
+          _isLoading = true;
+        });
+      }
+
+      final email = user.email!;
+
+
+      // GET PROFILE + LANDSCAPE + PORTRAIT
+      final responses = await Future.wait([
+        http.get(
+          Uri.parse(
+            '$baseUrl/musician2_detail'
+                '?email=${Uri.encodeComponent(email)}',
+          ),
         ),
-      );
+        http.get(
+          Uri.parse(
+            '$baseUrl/my_play2s_l/'
+                '?musician2_email=${Uri.encodeComponent(email)}',
+          ),
+        ),
+        http.get(
+          Uri.parse(
+            '$baseUrl/my_play2s_p/'
+                '?musician2_email=${Uri.encodeComponent(email)}',
+          ),
+        ),
+      ]);
+
+      final profileResponse = responses[0];
+      final landscapeResponse = responses[1];
+      final portraitResponse = responses[2];
 
       debugPrint(
         'PROFILE STATUS: ${profileResponse.statusCode}',
+      );
+
+      debugPrint(
+        'LANDSCAPE STATUS: ${landscapeResponse.statusCode}',
+      );
+
+      debugPrint(
+        'PORTRAIT STATUS: ${portraitResponse.statusCode}',
       );
 
       if (profileResponse.statusCode != 200) {
@@ -113,6 +147,19 @@ class _InventoryContentState extends State<InventoryContent> {
         );
       }
 
+      if (landscapeResponse.statusCode != 200) {
+        throw Exception(
+          'Failed to load landscape videos',
+        );
+      }
+
+      if (portraitResponse.statusCode != 200) {
+        throw Exception(
+          'Failed to load portrait videos',
+        );
+      }
+
+      // PROFILE
       final profileData =
       jsonDecode(profileResponse.body);
 
@@ -134,54 +181,14 @@ class _InventoryContentState extends State<InventoryContent> {
         );
       }
 
-      // GET LANDSCAPE Vd
-
-      final landscapeResponse = await http.get(
-        Uri.parse(
-          '$baseUrl/play2s_l/'
-              '?musician=${Uri.encodeComponent(displayName)}',
-        ),
-      );
-
-      debugPrint(
-        'LANDSCAPE STATUS: '
-            '${landscapeResponse.statusCode}',
-      );
-
-      if (landscapeResponse.statusCode != 200) {
-        throw Exception(
-          'Failed to load landscape videos',
-        );
-      }
-
+      // VIDEO DATA
       final landscapeData =
       jsonDecode(landscapeResponse.body);
-
-      // GET PORTRAIT VIDEOS
-
-      final portraitResponse = await http.get(
-        Uri.parse(
-          '$baseUrl/play2s_p/'
-              '?musician=${Uri.encodeComponent(displayName)}',
-        ),
-      );
-
-      debugPrint(
-        'PORTRAIT STATUS: '
-            '${portraitResponse.statusCode}',
-      );
-
-      if (portraitResponse.statusCode != 200) {
-        throw Exception(
-          'Failed to load portrait videos',
-        );
-      }
 
       final portraitData =
       jsonDecode(portraitResponse.body);
 
       // COMBINE VIDEOS
-
       final List<Map<String, dynamic>> allVideos = [];
 
       if (landscapeData is List) {
@@ -208,10 +215,8 @@ class _InventoryContentState extends State<InventoryContent> {
         _isLoading = false;
       });
 
-      debugPrint(
-        'TOTAL INVENTORY VIDEOS: '
-            '${allVideos.length}',
-      );
+
+      _loadViewCounts(allVideos);
     } catch (e) {
       debugPrint(
         'INVENTORY ERROR: $e',
@@ -230,7 +235,68 @@ class _InventoryContentState extends State<InventoryContent> {
           ),
         );
       }
+    } finally {
+      _isLoadingInventory = false;
     }
+  }
+
+  Future<void> _loadViewCounts(
+      List<Map<String, dynamic>> videos) async {
+    try {
+      await Future.wait(
+        videos.map((video) async {
+          final videoUrl =
+              video['url']?.toString() ?? '';
+
+          if (videoUrl.isEmpty) {
+            return;
+          }
+
+          final viewCount =
+          await _getViewCount(videoUrl);
+
+          video['view_count'] = viewCount;
+        }),
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _myVideos = List<Map<String, dynamic>>.from(
+          videos,
+        );
+      });
+
+    } catch (e) {
+      debugPrint(
+        'INVENTORY VIEW COUNTS ERROR: $e',
+      );
+    }
+  }
+
+  Future<int> _getViewCount(String videoUrl) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/get_play2_count'
+              '?p=${Uri.encodeComponent(videoUrl)}',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data is List && data.isNotEmpty) {
+          return data[0]['view_count'] ?? 0;
+        }
+      }
+    } catch (e) {
+      debugPrint(
+        'GET INVENTORY VIEW ERROR: $e',
+      );
+    }
+
+    return 0;
   }
 
   @override
@@ -306,7 +372,6 @@ class _InventoryContentState extends State<InventoryContent> {
               shrinkWrap: true,
               physics:
               const NeverScrollableScrollPhysics(),
-
               gridDelegate:
               SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: columns,
@@ -315,9 +380,7 @@ class _InventoryContentState extends State<InventoryContent> {
                 childAspectRatio:
                 columns == 1 ? 1.4 : 1.05,
               ),
-
               itemCount: _myVideos.length,
-
               itemBuilder: (context, index) {
                 final video =
                 _myVideos[index];
@@ -335,12 +398,18 @@ class _InventoryContentState extends State<InventoryContent> {
   Widget _buildInventoryCard(
       Map<String, dynamic> video,
       ) {
+    final isPublished =
+        video['void']?.toString() == '0';
+
     final title =
         video['video_title']?.toString() ??
             'Untitled';
 
     final musicianName =
-        video['musician_name']?.toString().trim() ?? '';
+        video['musician_name']
+            ?.toString()
+            .trim() ??
+            '';
 
     final artist =
     musicianName.isNotEmpty
@@ -348,8 +417,7 @@ class _InventoryContentState extends State<InventoryContent> {
         : _displayName;
 
     final views =
-        video['view_count']?.toString() ??
-            '0';
+        video['view_count']?.toString() ?? '0';
 
     final date =
         video['created_time']?.toString() ??
@@ -370,7 +438,7 @@ class _InventoryContentState extends State<InventoryContent> {
       children: [
         Expanded(
           child: GestureDetector(
-            onTap: () {
+            onTap: () async {
               debugPrint(
                 'OPEN VIDEO: '
                     '$title | '
@@ -378,7 +446,8 @@ class _InventoryContentState extends State<InventoryContent> {
                     'youtube=${video['youtube_url']}',
               );
 
-              Navigator.push(
+              final changed =
+              await Navigator.push<bool>(
                 context,
                 MaterialPageRoute(
                   builder: (context) =>
@@ -387,21 +456,26 @@ class _InventoryContentState extends State<InventoryContent> {
                         video['url']
                             ?.toString() ??
                             '',
+                        isPublished:
+                        video['void']
+                            ?.toString() ==
+                            '0',
+                        inventoryVideo: video,
                       ),
                 ),
               );
-            },
 
+              if (changed == true) {
+                _loadInventory();
+              }
+            },
             child: Container(
               clipBehavior: Clip.antiAlias,
-
               decoration: BoxDecoration(
                 color:
                 Colors.white.withOpacity(0.08),
-
                 borderRadius:
                 BorderRadius.circular(8),
-
                 border: Border.all(
                   color:
                   const Color(0xFFFFD600)
@@ -409,23 +483,20 @@ class _InventoryContentState extends State<InventoryContent> {
                   width: 1,
                 ),
               ),
-
               child: Stack(
                 children: [
-
                   // VIDEO PREVIEW IMAGE
-
                   Positioned.fill(
                     child: preview != null
                         ? Image.network(
                       preview,
                       fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: double.infinity,
-
+                      width:
+                      double.infinity,
+                      height:
+                      double.infinity,
                       headers:
                       _mediaHeaders,
-
                       loadingBuilder: (
                           context,
                           child,
@@ -439,14 +510,12 @@ class _InventoryContentState extends State<InventoryContent> {
                         return const Center(
                           child:
                           CircularProgressIndicator(
-                            color:
-                            Color(
+                            color: Color(
                               0xFFFFD600,
                             ),
                           ),
                         );
                       },
-
                       errorBuilder: (
                           context,
                           error,
@@ -479,21 +548,60 @@ class _InventoryContentState extends State<InventoryContent> {
                     ),
                   ),
 
-                  // EDIT + DELETE
+                  // DIM UNPUBLISHED VIDEOS
+                  if (!isPublished)
+                    Positioned.fill(
+                      child: Container(
+                        color: Colors.black
+                            .withOpacity(0.55),
+                      ),
+                    ),
 
+                  if (!isPublished)
+                    Positioned(
+                      right: 8,
+                      bottom: 8,
+                      child: Container(
+                        padding:
+                        const EdgeInsets
+                            .symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration:
+                        BoxDecoration(
+                          color: Colors.black
+                              .withOpacity(0.75),
+                          borderRadius:
+                          BorderRadius.circular(
+                            6,
+                          ),
+                        ),
+                        child: const Text(
+                          'Unpublished',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight:
+                            FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // EDIT, PUBLISH/UNPUBLISH
                   Positioned(
                     top: 8,
                     right: 8,
-
                     child: Container(
-                      decoration: BoxDecoration(
+                      decoration:
+                      BoxDecoration(
                         color: Colors.black87,
                         borderRadius:
                         BorderRadius.circular(
                           4,
                         ),
                       ),
-
                       child: Row(
                         children: [
                           IconButton(
@@ -502,15 +610,12 @@ class _InventoryContentState extends State<InventoryContent> {
                               color: Colors.white,
                               size: 16,
                             ),
-
                             constraints:
                             const BoxConstraints(),
-
                             padding:
                             const EdgeInsets.all(
                               6,
                             ),
-
                             onPressed: () {
                               Navigator.push(
                                 context,
@@ -522,6 +627,12 @@ class _InventoryContentState extends State<InventoryContent> {
                                         video['url']
                                             ?.toString() ??
                                             '',
+                                        isPublished:
+                                        video['void']
+                                            ?.toString() ==
+                                            '0',
+                                        inventoryVideo:
+                                        video,
                                         autoEdit: true,
                                       ),
                                 ),
@@ -530,23 +641,24 @@ class _InventoryContentState extends State<InventoryContent> {
                           ),
 
                           IconButton(
-                            icon: const Icon(
-                              Icons.delete,
-                              color:
-                              Colors.redAccent,
+                            icon: Icon(
+                              isPublished
+                                  ? Icons.public
+                                  : Icons.lock,
+                              color: Colors.white,
                               size: 16,
                             ),
-
                             constraints:
                             const BoxConstraints(),
-
                             padding:
                             const EdgeInsets.all(
                               6,
                             ),
-
+                            tooltip: isPublished
+                                ? 'Unpublish'
+                                : 'Publish',
                             onPressed: () {
-                              _showDeleteDialog(
+                              _showPublishDialog(
                                 video,
                               );
                             },
@@ -563,26 +675,29 @@ class _InventoryContentState extends State<InventoryContent> {
 
         const SizedBox(height: 8),
 
-        // PROFILE ICON + TITLE
-
+        // PROFILE ICON, TITLE
         Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment:
+          CrossAxisAlignment.start,
           children: [
             Container(
               width: 30,
               height: 30,
-              decoration: const BoxDecoration(
+              decoration:
+              const BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.grey,
               ),
-              clipBehavior: Clip.antiAlias,
+              clipBehavior:
+              Clip.antiAlias,
               child: profileUrl != null
                   ? Image.network(
                 profileUrl,
                 width: 30,
                 height: 30,
                 fit: BoxFit.cover,
-                headers: _mediaHeaders,
+                headers:
+                _mediaHeaders,
                 errorBuilder: (
                     context,
                     error,
@@ -606,15 +721,19 @@ class _InventoryContentState extends State<InventoryContent> {
 
             Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment:
+                CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    overflow:
+                    TextOverflow.ellipsis,
+                    style:
+                    const TextStyle(
                       color: Colors.white,
                       fontSize: 13,
-                      fontWeight: FontWeight.bold,
+                      fontWeight:
+                      FontWeight.bold,
                     ),
                   ),
 
@@ -622,8 +741,10 @@ class _InventoryContentState extends State<InventoryContent> {
 
                   Text(
                     artist,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    overflow:
+                    TextOverflow.ellipsis,
+                    style:
+                    const TextStyle(
                       color: Colors.white60,
                       fontSize: 12,
                     ),
@@ -641,7 +762,6 @@ class _InventoryContentState extends State<InventoryContent> {
           const EdgeInsets.only(
             left: 36.0,
           ),
-
           child: Row(
             children: [
               Expanded(
@@ -651,8 +771,7 @@ class _InventoryContentState extends State<InventoryContent> {
                   TextOverflow.ellipsis,
                   style:
                   const TextStyle(
-                    color:
-                    Colors.white60,
+                    color: Colors.white60,
                     fontSize: 11,
                   ),
                 ),
@@ -669,8 +788,7 @@ class _InventoryContentState extends State<InventoryContent> {
                   TextAlign.right,
                   style:
                   const TextStyle(
-                    color:
-                    Colors.white38,
+                    color: Colors.white38,
                     fontSize: 11,
                   ),
                 ),
@@ -682,38 +800,41 @@ class _InventoryContentState extends State<InventoryContent> {
     );
   }
 
-  void _showDeleteDialog(
+  void _showPublishDialog(
       Map<String, dynamic> video,
       ) {
+    final isPublished =
+        video['void']?.toString() == '0';
+
+    final action =
+    isPublished ? 'Unpublish' : 'Publish';
+
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
           backgroundColor:
           const Color(0xFF1C1C1C),
-
-          title: const Text(
-            'Delete Video?',
-            style: TextStyle(
+          title: Text(
+            'Do you want to $action this video?',
+            style: const TextStyle(
               color: Colors.white,
-              fontWeight:
-              FontWeight.bold,
+              fontWeight: FontWeight.bold,
             ),
           ),
-
-          content: const Text(
-            'Are you sure you want to delete this video?',
-            style: TextStyle(
+          content: Text(
+            isPublished
+                ? 'This video will no longer be visible to the public.'
+                : 'This video will become visible to the public.',
+            style: const TextStyle(
               color: Colors.white70,
             ),
           ),
-
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
               },
-
               child: const Text(
                 'Cancel',
                 style: TextStyle(
@@ -725,32 +846,120 @@ class _InventoryContentState extends State<InventoryContent> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
-
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Delete is not connected yet',
-                    ),
-                  ),
-                );
+                _togglePublish(video);
               },
-
               style:
               ElevatedButton.styleFrom(
                 backgroundColor:
-                Colors.redAccent,
-                foregroundColor:
-                Colors.white,
+                const Color(0xFFFFD600),
+                foregroundColor: Colors.black,
               ),
-
-              child:
-              const Text('Delete'),
+              child: Text(
+                action,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         );
       },
     );
+  }
+
+  Future<void> _togglePublish(
+      Map<String, dynamic> video,
+      ) async {
+    final user =
+        Supabase.instance.client.auth.currentUser;
+
+    if (user == null || user.email == null) {
+      return;
+    }
+
+    final isPublished =
+        video['void']?.toString() == '0';
+
+    final endpoint = isPublished
+        ? 'unpublish_playvideo2'
+        : 'publish_playvideo2';
+
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/$endpoint'
+              '?p=${Uri.encodeComponent(
+            video['url']?.toString() ?? '',
+          )}'
+              '&musician2_email=${Uri.encodeComponent(
+            user.email!,
+          )}',
+        ),
+      );
+
+      debugPrint(
+        'PUBLISH STATUS: ${response.statusCode}',
+      );
+
+      debugPrint(
+        'PUBLISH RESPONSE: ${response.body}',
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Failed to update video status',
+        );
+      }
+
+      final data =
+      jsonDecode(response.body);
+
+      final result =
+      data is List && data.isNotEmpty
+          ? data[0]['result']
+          ?.toString()
+          : null;
+
+      if (result == 'Success' ||
+          result == 'Already Published' ||
+          result == 'Already Unpublished') {
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context)
+            .showSnackBar(
+          SnackBar(
+            content: Text(
+              isPublished
+                  ? 'Video unpublished'
+                  : 'Video published',
+            ),
+          ),
+        );
+
+        await _loadInventory();
+      } else {
+        throw Exception(
+          data is List && data.isNotEmpty
+              ? data[0]['description']
+              ?.toString()
+              : 'Unknown error',
+        );
+      }
+    } catch (e) {
+      debugPrint(
+        'PUBLISH ERROR: $e',
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to update video: $e',
+          ),
+        ),
+      );
+    }
   }
 }

@@ -1,16 +1,21 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'youtube_player.dart';
 
 class InventoryVideoScreen extends StatefulWidget {
   final String videoUrl;
   final bool autoEdit;
+  final bool isPublished;
+  final Map<String, dynamic>? inventoryVideo;
 
   const InventoryVideoScreen({
     super.key,
     required this.videoUrl,
+    required this.isPublished,
     this.autoEdit = false,
+    this.inventoryVideo,
   });
 
   @override
@@ -32,12 +37,15 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
   Map<String, dynamic>? video;
 
   bool isLoading = true;
+  bool _isPublished = false;
 
   String? _profilePicturePath;
+  int viewCount = 0;
 
   @override
   void initState() {
     super.initState();
+    _isPublished = widget.isPublished;
     _loadVideo();
   }
 
@@ -94,6 +102,10 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
         'INVENTORY VIDEO STATUS: ${response.statusCode}',
       );
 
+      debugPrint(
+        'INVENTORY VIDEO RESPONSE: ${response.body}',
+      );
+
       if (response.statusCode != 200) {
         throw Exception(
           'Failed to load video',
@@ -136,6 +148,62 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
         );
 
         await _addViewCount();
+        await _getViewCount();
+
+        if (widget.autoEdit && mounted) {
+          WidgetsBinding.instance
+              .addPostFrameCallback((_) {
+            if (mounted) {
+              _showEditDialog();
+            }
+          });
+        }
+      } else if (widget.inventoryVideo != null) {
+        if (!mounted) return;
+
+        setState(() {
+          video = Map<String, dynamic>.from(
+            widget.inventoryVideo!,
+          );
+          isLoading = false;
+        });
+
+        if (widget.autoEdit && mounted) {
+          WidgetsBinding.instance
+              .addPostFrameCallback((_) {
+            if (mounted) {
+              _showEditDialog();
+            }
+          });
+        }
+      } else if (widget.inventoryVideo != null) {
+        if (!mounted) return;
+
+        setState(() {
+          video = Map<String, dynamic>.from(
+            widget.inventoryVideo!,
+          );
+          isLoading = false;
+        });
+
+        if (widget.autoEdit && mounted) {
+          WidgetsBinding.instance
+              .addPostFrameCallback((_) {
+            if (mounted) {
+              _showEditDialog();
+            }
+          });
+        }
+
+      } else if (widget.inventoryVideo != null) {
+        if (!mounted) return;
+
+        setState(() {
+          video = Map<String, dynamic>.from(
+            widget.inventoryVideo!,
+          );
+          isLoading = false;
+        });
 
         if (widget.autoEdit && mounted) {
           WidgetsBinding.instance
@@ -210,9 +278,7 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
   Future<void> _addViewCount() async {
     try {
       final email =
-          video?['musician_email']
-              ?.toString() ??
-              '';
+          Supabase.instance.client.auth.currentUser?.email ?? '';
 
       if (email.isEmpty) {
         return;
@@ -236,6 +302,39 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
     }
   }
 
+  Future<void> _getViewCount() async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/get_play2_count'
+              '?p=${Uri.encodeComponent(widget.videoUrl)}',
+        ),
+      );
+
+      debugPrint(
+        'GET VIEW STATUS: ${response.statusCode}',
+      );
+
+      debugPrint(
+        'GET VIEW RESPONSE: ${response.body}',
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data is List && data.isNotEmpty) {
+          setState(() {
+            viewCount = data[0]['view_count'] ?? 0;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint(
+        'GET VIEW ERROR: $e',
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -244,8 +343,14 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
-        leading: const BackButton(
-          color: Colors.white,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back,
+            color: Colors.white,
+          ),
+          onPressed: () {
+            Navigator.pop(context, true);
+          },
         ),
         title: const Text(
           'Video Details',
@@ -276,6 +381,9 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
   }
 
   Widget _buildVideoContent() {
+
+    final isPublished = _isPublished;
+
     final title =
         video!['video_title']?.toString() ?? '';
 
@@ -296,8 +404,7 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
     final instrument =
         video!['instrument']?.toString() ?? '';
 
-    final views =
-        video!['view_count']?.toString() ?? '0';
+    final views = viewCount.toString();
 
     final createdTime =
         video!['created_time']?.toString() ?? '';
@@ -458,14 +565,13 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
 
           const SizedBox(height: 20),
 
-          // EDIT + DELETE
+          // EDIT, publish/unpublish
 
           Row(
             children: [
               Expanded(
-                child: ElevatedButton.icon(
-                  onPressed:
-                  _showEditDialog,
+                child: OutlinedButton.icon(
+                  onPressed: _showEditDialog,
                   icon: const Icon(
                     Icons.edit,
                     size: 18,
@@ -473,28 +579,20 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
                   label: const Text(
                     'Edit Video',
                     style: TextStyle(
-                      fontWeight:
-                      FontWeight.bold,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  style:
-                  ElevatedButton.styleFrom(
-                    backgroundColor:
-                    const Color(
-                      0xFFFFD600,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(
+                      color: Colors.white24,
                     ),
-                    foregroundColor:
-                    Colors.black,
-                    padding:
-                    const EdgeInsets.symmetric(
+                    padding: const EdgeInsets.symmetric(
                       vertical: 12,
                     ),
-                    shape:
-                    RoundedRectangleBorder(
+                    shape: RoundedRectangleBorder(
                       borderRadius:
-                      BorderRadius.circular(
-                        10,
-                      ),
+                      BorderRadius.circular(10),
                     ),
                   ),
                 ),
@@ -504,44 +602,40 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
 
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed:
-                  _showDeleteDialog,
-                  icon: const Icon(
-                    Icons.delete_outline,
+                  onPressed: () {
+                    _showPublishDialog();
+                  },
+                  icon: Icon(
+                    isPublished
+                        ? Icons.lock
+                        : Icons.public,
                     size: 18,
                   ),
-                  label: const Text(
-                    'Delete',
-                    style: TextStyle(
-                      fontWeight:
-                      FontWeight.bold,
+                  label: Text(
+                    isPublished
+                        ? 'Set Private'
+                        : 'Set Public',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  style:
-                  OutlinedButton.styleFrom(
-                    foregroundColor:
-                    Colors.redAccent,
-                    side:
-                    const BorderSide(
-                      color: Colors.redAccent,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(
+                      color: Colors.white24,
                     ),
-                    padding:
-                    const EdgeInsets.symmetric(
+                    padding: const EdgeInsets.symmetric(
                       vertical: 12,
                     ),
-                    shape:
-                    RoundedRectangleBorder(
+                    shape: RoundedRectangleBorder(
                       borderRadius:
-                      BorderRadius.circular(
-                        10,
-                      ),
+                      BorderRadius.circular(10),
                     ),
                   ),
                 ),
               ),
             ],
           ),
-
           const SizedBox(height: 24),
 
           const Divider(
@@ -608,6 +702,114 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _updateVideo({
+    required String title,
+    required String description,
+    required String musicTitle,
+    required String originalPerformer,
+    required String instrument,
+  }) async {
+    final user =
+        Supabase.instance.client.auth.currentUser;
+
+    if (user == null || user.email == null) {
+      throw Exception(
+        'User is not logged in',
+      );
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/modify_playvideo2'
+              '?p=${Uri.encodeComponent(
+            widget.videoUrl,
+          )}'
+              '&musician2_email=${Uri.encodeComponent(
+            user.email!,
+          )}'
+              '&video_title=${Uri.encodeComponent(
+            title,
+          )}'
+              '&description=${Uri.encodeComponent(
+            description,
+          )}'
+              '&music_title=${Uri.encodeComponent(
+            musicTitle,
+          )}'
+              '&original=${Uri.encodeComponent(
+            originalPerformer,
+          )}'
+              '&instrument=${Uri.encodeComponent(
+            instrument,
+          )}',
+        ),
+      );
+
+      debugPrint(
+        'UPDATE VIDEO STATUS: ${response.statusCode}',
+      );
+
+      debugPrint(
+        'UPDATE VIDEO RESPONSE: ${response.body}',
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Failed to update video',
+        );
+      }
+
+      final data = jsonDecode(response.body);
+
+      final result =
+      data is List && data.isNotEmpty
+          ? data[0]['result']?.toString()
+          : null;
+
+      if (result != 'Success') {
+        throw Exception(
+          data is List && data.isNotEmpty
+              ? data[0]['description']?.toString()
+              : 'Unknown error',
+        );
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        video!['video_title'] = title;
+        video!['description'] = description;
+        video!['music_title'] = musicTitle;
+        video!['original_performer'] =
+            originalPerformer;
+        video!['instrument'] = instrument;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Video updated',
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint(
+        'UPDATE VIDEO ERROR: $e',
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to update video: $e',
+          ),
+        ),
+      );
+    }
   }
 
   void _showEditDialog() {
@@ -728,35 +930,24 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
             ),
 
             ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  video!['video_title'] =
-                      titleController.text;
+              onPressed: () async {
+                await _updateVideo(
+                  title: titleController.text,
+                  description:
+                  descriptionController.text,
+                  musicTitle:
+                  musicController.text,
+                  originalPerformer:
+                  performerController.text,
+                  instrument:
+                  instrumentController.text,
+                );
 
-                  video!['description'] =
-                      descriptionController.text;
-
-                  video!['music_title'] =
-                      musicController.text;
-
-                  video!['original_performer'] =
-                      performerController.text;
-
-                  video!['instrument'] =
-                      instrumentController.text;
-                });
+                if (!mounted) return;
 
                 Navigator.pop(context);
-
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Video updated (mockup only)',
-                    ),
-                  ),
-                );
               },
+
               style:
               ElevatedButton.styleFrom(
                 backgroundColor:
@@ -778,6 +969,164 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
         );
       },
     );
+  }
+
+  void _showPublishDialog() {
+    final isPublished = _isPublished;
+
+    final action =
+    isPublished ? 'Unpublish' : 'Publish';
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor:
+          const Color(0xFF1C1C1C),
+
+          title: Text(
+            'Do you want to $action this video?',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+
+          content: Text(
+            isPublished
+                ? 'This video will no longer be visible to the public.'
+                : 'This video will become visible to the public.',
+            style: const TextStyle(
+              color: Colors.white70,
+            ),
+          ),
+
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Colors.white70,
+                ),
+              ),
+            ),
+
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _togglePublish();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor:
+                const Color(0xFFFFD600),
+                foregroundColor: Colors.black,
+              ),
+              child: Text(
+                action,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _togglePublish() async {
+    final user =
+        Supabase.instance.client.auth.currentUser;
+
+    if (user == null || user.email == null) {
+      return;
+    }
+
+    final isPublished = _isPublished;
+
+    final endpoint = isPublished
+        ? 'unpublish_playvideo2'
+        : 'publish_playvideo2';
+
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/$endpoint'
+              '?p=${Uri.encodeComponent(
+            widget.videoUrl,
+          )}'
+              '&musician2_email=${Uri.encodeComponent(
+            user.email!,
+          )}',
+        ),
+      );
+
+      debugPrint(
+        'PUBLISH STATUS: ${response.statusCode}',
+      );
+
+      debugPrint(
+        'PUBLISH RESPONSE: ${response.body}',
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Failed to update video status',
+        );
+      }
+
+      final data = jsonDecode(response.body);
+
+      final result =
+      data is List && data.isNotEmpty
+          ? data[0]['result']?.toString()
+          : null;
+
+      if (result == 'Success' ||
+          result == 'Already Published' ||
+          result == 'Already Unpublished') {
+        if (!mounted) return;
+
+        setState(() {
+          _isPublished = !_isPublished;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isPublished
+                  ? 'Video unpublished'
+                  : 'Video published',
+            ),
+          ),
+        );
+
+
+      } else {
+        throw Exception(
+          data is List && data.isNotEmpty
+              ? data[0]['description']?.toString()
+              : 'Unknown error',
+        );
+      }
+    } catch (e) {
+      debugPrint(
+        'PUBLISH ERROR: $e',
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to update video: $e',
+          ),
+        ),
+      );
+    }
   }
 
   Widget _buildEditField({
@@ -820,72 +1169,6 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
     );
   }
 
-  void _showDeleteDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor:
-          const Color(0xFF1C1C1C),
-
-          title: const Text(
-            'Delete Video?',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight:
-              FontWeight.bold,
-            ),
-          ),
-
-          content: const Text(
-            'Are you sure you want to delete this video?',
-            style: TextStyle(
-              color: Colors.white70,
-            ),
-          ),
-
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.white70,
-                ),
-              ),
-            ),
-
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Delete is not connected yet',
-                    ),
-                  ),
-                );
-              },
-              style:
-              ElevatedButton.styleFrom(
-                backgroundColor:
-                Colors.redAccent,
-                foregroundColor:
-                Colors.white,
-              ),
-              child: const Text(
-                'Delete',
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
   Widget _buildInfoRow(
       String label,

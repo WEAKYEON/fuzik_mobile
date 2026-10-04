@@ -22,6 +22,7 @@ class MainLayout extends StatefulWidget {
 
 class _MainLayoutState extends State<MainLayout> {
   int _selectedIndex = 0;
+  final _dashboardKey = GlobalKey<DashboardContentState>();
 
   String _displayName = 'User';
   String? _profilePicturePath;
@@ -175,7 +176,9 @@ class _MainLayoutState extends State<MainLayout> {
         child: IndexedStack(
           index: _selectedIndex,
           children: [
-            const DashboardContent(),
+            DashboardContent(
+              key: _dashboardKey,
+            ),
 
             UploadContent(
               isActive: _selectedIndex == 1,
@@ -214,6 +217,10 @@ class _MainLayoutState extends State<MainLayout> {
         currentIndex: _selectedIndex,
 
         onTap: (index) {
+          if (index == 0 && _selectedIndex != 0) {
+            _dashboardKey.currentState?.refreshDashboard();
+          }
+
           setState(() {
             _selectedIndex = index;
           });

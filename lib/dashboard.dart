@@ -3,21 +3,46 @@ import 'dart:convert';
 import 'view_play.dart';
 import 'jam_watch.dart'; 
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart'; //This is a package to cache the images, t
 
 class DashboardContent extends StatefulWidget {
   const DashboardContent({super.key});
 
   @override
-  State<DashboardContent> createState() => _DashboardContentState();
+  State<DashboardContent> createState() => DashboardContentState();
 }
 
-class _DashboardContentState extends State<DashboardContent> {
-  bool isSoloSelected = true; 
+class DashboardContentState extends State<DashboardContent> {
+  bool isSoloSelected = true;
   final _searchController = TextEditingController();
   String _searchQuery = '';
   MemoryImage? image;
+
+  Future<int> _getViewCount(String videoUrl) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          'https://engine01.fuzikapp.com/get_play2_count'
+              '?p=${Uri.encodeComponent(videoUrl)}',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data is List && data.isNotEmpty) {
+          return data[0]['view_count'] ?? 0;
+        }
+      }
+    } catch (e) {
+      debugPrint('GET DASHBOARD VIEW ERROR: $e');
+    }
+
+    return 0;
+  }
+
+
+
   Future<Map<String, List<Map<String, dynamic>>>> _fetchVideos({
     String query = '',
   }) async {
@@ -33,10 +58,12 @@ class _DashboardContentState extends State<DashboardContent> {
     
       );
 
+
       final responses = await Future.wait([
-        http.get(lUri, headers:{'Referer': 'https://fuzikapp.com'}),
-        http.get(pUri, headers:{'Referer': 'https://fuzikapp.com'}),
+        http.get(lUri, headers: {'Referer': 'https://fuzikapp.com'}),
+        http.get(pUri, headers: {'Referer': 'https://fuzikapp.com'}),
       ]);
+
 
       final lResponse = responses[0];
       final pResponse = responses[1];
@@ -50,6 +77,25 @@ class _DashboardContentState extends State<DashboardContent> {
 
       final lvideos = List<Map<String, dynamic>>.from(lData);
       final pvideos = List<Map<String, dynamic>>.from(pData);
+
+      await Future.wait([
+        ...lvideos.map((video) async {
+          final url = video['url']?.toString() ?? '';
+
+          if (url.isNotEmpty) {
+            video['view_count'] = await _getViewCount(url);
+          }
+        }),
+        ...pvideos.map((video) async {
+          final url = video['url']?.toString() ?? '';
+
+          if (url.isNotEmpty) {
+            video['view_count'] = await _getViewCount(url);
+          }
+        }),
+      ]);
+
+
       Map<String, List<Map<String, dynamic>>> result = {
         'landscape': lvideos,
         'portrait': pvideos,
@@ -64,10 +110,6 @@ class _DashboardContentState extends State<DashboardContent> {
 
 
   @override
-  void initState() {
-    super.initState();
-  }
-  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -75,6 +117,8 @@ class _DashboardContentState extends State<DashboardContent> {
 
   @override
   Widget build(BuildContext context) {
+    final videosFuture = _fetchVideos(query: _searchQuery);
+
     double screenWidth = MediaQuery.of(context).size.shortestSide;
     double paddingHorizontal = screenWidth < 600 ? 16.0 : 40.0;
     bool isTablet = screenWidth >= 600;
@@ -179,7 +223,7 @@ class _DashboardContentState extends State<DashboardContent> {
 
           //Portrait Videos
           isSoloSelected?FutureBuilder<Map<String, List<Map<String, dynamic>>>>(
-          future: _fetchVideos(query: _searchQuery), 
+          future: videosFuture,
           builder: (context,snapshot){
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Color(0xFFFFD600))));
@@ -205,10 +249,10 @@ class _DashboardContentState extends State<DashboardContent> {
               
                   final title = video['video_title']?.toString() ?? '';
                   final artist = video['musician_name']?.toString() ?? '';
-                  final views = '${video['views'] ?? 0} views';
+                  final views = '${video['view_count'] ?? 0} views';
                   final preview = video['preview']?.toString()??'';
                   final profileUrl = video['musician_profile_pic']?.toString() ?? '';
-                  final sampleurl='https://www.youtube.com/watch?v=8Ju_mYge1Tc';
+                  final sampleurl = video['youtube_url']?.toString() ?? '';
                   final description=video['description']?.toString() ??'';
                   return _buildVideoCard(
                     title,
@@ -229,7 +273,8 @@ class _DashboardContentState extends State<DashboardContent> {
                               views: views,
                               url: sampleurl,
                               profileUrl: profileUrl,
-                              description:description
+                              description:description,
+                              musicianEmail: video['musician_email']?.toString() ?? '',
                             ),
                           ),
                         );
@@ -252,7 +297,7 @@ class _DashboardContentState extends State<DashboardContent> {
           const SizedBox(height: 16),
           // ตารางวิดีโอ (GridView)
           FutureBuilder<Map<String, List<Map<String, dynamic>>>>(
-            future: _fetchVideos(query: _searchQuery),
+            future: videosFuture,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Color(0xFFFFD600))));
@@ -274,12 +319,14 @@ class _DashboardContentState extends State<DashboardContent> {
                 itemBuilder: (context, index) {
                   final video = videos[index];
 
+                  //debugPrint('DASHBOARD VIDEO DATA: $video',);
+
                   final title = video['video_title']?.toString() ?? '';
                   final artist = video['musician_name']?.toString() ?? '';
-                  final views = '${video['views'] ?? 0} views';
+                  final views = '${video['view_count'] ?? 0} views';
                   final preview = video['preview']?.toString()??'';
                   final profileUrl = video['musician_profile_pic']?.toString() ?? '';
-                  final sampleurl='https://www.youtube.com/watch?v=8Ju_mYge1Tc';
+                  final sampleurl = video['youtube_url']?.toString() ?? '';
                   final description = video['description']?.toString()??'';
                   return _buildVideoCard(
                     title,
@@ -301,6 +348,7 @@ class _DashboardContentState extends State<DashboardContent> {
                               url:sampleurl,
                               profileUrl: profileUrl,
                               description: description,
+                              musicianEmail: video['musician_email']?.toString() ?? '',
                             ),
                           ),
                         );
@@ -322,6 +370,12 @@ class _DashboardContentState extends State<DashboardContent> {
         ],
       ),
     );
+  }
+  void refreshDashboard() {
+    setState(() {
+      _searchQuery = '';
+      _searchController.clear();
+    });
   }
 
   Widget _buildVideoCard(
