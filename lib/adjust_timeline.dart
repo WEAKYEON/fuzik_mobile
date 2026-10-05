@@ -23,11 +23,43 @@ class AdjustTimelineScreen extends StatefulWidget {
 }
 
 class _AdjustTimelineScreenState extends State<AdjustTimelineScreen> {
-  late List<double> offsets ;
   final List<Color> trackColors = [Colors.cyanAccent, Colors.blueAccent, Colors.greenAccent, Colors.orangeAccent];
   late List<AudioPlayer> players;
   late List<Waveform?> waveforms;
   bool isMasterPlaying=false;
+  double zoom = 1.0;
+  double get pixelsPerSecond => 60.0 * zoom;
+  late List<double> audioDelays;
+  double timelineScroll=0.0;
+
+double get maxTimelineWidth {
+  double maxWidth = 0.0;
+
+  for (int i = 0; i < players.length; i++) {
+    final duration = players[i].duration;
+
+    if (duration != null) {
+      final durationSeconds =
+          duration.inMilliseconds / 1000.0;
+
+      final endTime =
+          audioDelays[i] + durationSeconds;
+
+      final width =
+          endTime * pixelsPerSecond + 100.0;
+
+      if (width > maxWidth) {
+        maxWidth = width;
+      }
+    }
+  }
+
+  return maxWidth;
+}
+
+void set maxTimelineWidth(double value) {
+  maxTimelineWidth = value;
+}
 
 Future<File> getCachedAudio(String videoCode, String videoUrl) async{
     final cacheDir= await getTemporaryDirectory();
@@ -71,9 +103,9 @@ Future<File> getCachedAudio(String videoCode, String videoUrl) async{
 }
 
 //Play a single track
-Future<void> playTrack(int index) async {
+Future<void> playTrack(int index, {double secondsDelay=0.0}) async {
   final player = players[index];
-  final delay = offsets[index] / 50.0;
+  final delay = secondsDelay;
 
   if (delay > 0) {
     await Future.delayed(
@@ -125,7 +157,7 @@ Future<void> _initializeAudio() async{
     }
   }
 
-  Future<void> togglePlay(int index)async{
+Future<void> togglePlay(int index, double secondsDelay)async{
     final player=players[index];
     await player.setLoopMode(LoopMode.off);
     if(player.processingState==ProcessingState.completed){
@@ -135,7 +167,7 @@ Future<void> _initializeAudio() async{
       await player.pause();
       return;
     }
-    await playTrack(index);
+    await playTrack(index, secondsDelay:secondsDelay);
   }
 
 Future<void> playAllTracks() async {
@@ -175,7 +207,7 @@ Future<void> startOverAllTracks()async{
   @override
   void initState(){
     super.initState();
-    offsets = List<double>.filled(widget.selectedVideos.length, 0.0);
+    audioDelays = List<double>.filled(widget.selectedVideos.length, 0.0);
     players = List.generate(widget.selectedVideos.length, 
     (_)=>AudioPlayer());
     waveforms = List<Waveform?>.filled(
@@ -249,62 +281,132 @@ void dispose(){
              Center(
               child: const Text('Fine-tune your audio clips',style: TextStyle(fontSize: 15, color:Colors.white),),
              ),
-              SizedBox(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: widget.selectedVideos.length, // จำนวนวิดีโอ
-                  padding: const EdgeInsets.all(16.0),
-                  itemBuilder: (context, index) {
-                    return _buildTrackTimeline(index, isTablet: isTablet);
-                  },
-                ),
+             const SizedBox(height: 20,),
+             SizedBox(
+              width: double.infinity,
+              height: 70,
+               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                 children: [
+                   SizedBox(
+                    width:170,
+                     child: Slider(
+                      activeColor: Colors.yellow,
+                      inactiveColor: Colors.yellowAccent.withValues(alpha: 0.2),
+                      thumbColor: Colors.yellow,
+                      overlayColor: WidgetStateProperty.all(Colors.yellow.withValues(alpha: 0.2)),
+                      min: 0.5,
+                      max: 4.0, 
+                      divisions:7,
+                      label:'${zoom.toStringAsFixed(1)}x',             
+                      value: zoom,
+                      onChanged: (value) {
+                        setState(() {
+                          zoom = value;
+                        });
+                      },
+                                 ),
+                   ),
+                 ],
+               ),
+             ),
+              LayoutBuilder(
+                builder:(context, constraints) {
+                final viewportWidth = constraints.maxWidth;
+                final maxScroll = (maxTimelineWidth - viewportWidth).clamp(0.0, double.infinity);  
+                return Column(
+                  children: [
+                    SizedBox(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: widget.selectedVideos.length, // จำนวนวิดีโอ
+                        padding: const EdgeInsets.all(16.0),
+                        itemBuilder: (context, index) {
+                          return _buildTrackTimeline(index, isTablet: isTablet);
+                        },
+                      ),
+                    ),
+
+                    //Slider for timeline scroll
+                    Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 8.0, // Thicker track
+                        activeTrackColor: Colors.yellow[500],
+                        inactiveTrackColor: Colors.yellowAccent.withValues(alpha: 0.2),
+                        thumbColor: Colors.yellow, // Custom thumb color
+                        overlayColor: Colors.yellow.withValues(alpha: 0.2), // Splash ripple color when pressed
+                        valueIndicatorColor: Colors.indigo,
+                        thumbShape: RoundSliderThumbShape(enabledThumbRadius: 14.0), // Bigger thumb
+                        overlayShape: RoundSliderOverlayShape(overlayRadius: 28.0),
+                      ),
+                      child: Slider(
+                        min: 0,
+                        max: maxScroll > 0 ? maxScroll : 1,
+                        value: timelineScroll.clamp(
+                          0.0,
+                          maxScroll 
+                        ),
+                        onChanged: maxScroll > 0
+                            ? (value) {
+                                setState(() {
+                                  timelineScroll = value;
+                                });
+                              }
+                            : null,
+                      ),
+                    ),
+                  ),
+                  ],
+                );}
               ),
-              // Row(
-              //   mainAxisAlignment: MainAxisAlignment.center,
-              //   children: [
-              //     Container(
-              //       width: 35,
-              //       height: 35,
-              //       decoration: BoxDecoration(
-              //         color: Color.fromARGB(255, 44, 43, 43),
-              //         borderRadius: BorderRadius.circular(25),
-              //         boxShadow: [
-              //           BoxShadow(
-              //             color:  Colors.yellow.withValues(alpha: 0.7),
-              //             blurRadius: 10,
-              //             spreadRadius: 2
-              //           )
-              //         ]
-              //       ),
-              //       child: Center(
-              //         child: IconButton(
-              //           padding: EdgeInsets.zero,
-              //           icon: Icon(
-              //             isMasterPlaying?
-              //             Icons.pause
-              //             :Icons.play_arrow,
-              //             color: Colors.white,
-              //             size: 28,
-              //           ),
-              //           onPressed: isMasterPlaying? pauseAllTracks:playAllTracks,
-              //         ),
-              //       ),
-              //     ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 35,
+                    height: 35,
+                    decoration: BoxDecoration(
+                      color: Color.fromARGB(255, 44, 43, 43),
+                      borderRadius: BorderRadius.circular(25),
+                      boxShadow: [
+                        BoxShadow(
+                          color:  Colors.yellow.withValues(alpha: 0.7),
+                          blurRadius: 10,
+                          spreadRadius: 2
+                        )
+                      ]
+                    ),
+                    child: Center(
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: Icon(
+                          isMasterPlaying?
+                          Icons.pause
+                          :Icons.play_arrow,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                        onPressed: isMasterPlaying? pauseAllTracks:playAllTracks,
+                      ),
+                    ),
+                  ),
 
-              //     const SizedBox(width: 16),
+                  const SizedBox(width: 16),
 
-              //     IconButton(
-              //       icon: const Icon(
-              //         Icons.replay,
-              //         color: Colors.white,
-              //         size: 32,
-              //       ),
-              //       onPressed: ()async{
-              //         startOverAllTracks();
-              //       },
-              //     ),
-              //   ],
-              // ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.skip_previous,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                    onPressed: ()async{
+                      startOverAllTracks();
+                    },
+                  ),
+                ],
+              ),
               const SizedBox(height: 40,),
               Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -398,14 +500,14 @@ void dispose(){
 
 //Tracks
 Widget _buildTrackTimeline(int index, {required bool isTablet}) {
-    double secondsDelay = offsets[index] / 50.0;
+    double secondsDelay = audioDelays[index];
     final video = widget.selectedVideos[index];
     final preview = video['preview']?.toString() ?? '';
     final duration = players[index].duration;
-   
-      final durationInSeconds = duration?.inSeconds ;
-
-      
+    final durationInSeconds = duration?.inSeconds ;
+    final waveformLeft =audioDelays[index] * pixelsPerSecond;
+    final visibleWaveformLeft= waveformLeft-timelineScroll;
+  
     return Padding(
       padding: const EdgeInsets.only(bottom: 24.0),
       child: Column(
@@ -493,7 +595,7 @@ Widget _buildTrackTimeline(int index, {required bool isTablet}) {
                                         color: Colors.white,
                                         size: 25,
                                       ),
-                                      onPressed: () => togglePlay(index),
+                                      onPressed: () => togglePlay(index,secondsDelay),
                                     );
                                 }
                               ),
@@ -506,7 +608,7 @@ Widget _buildTrackTimeline(int index, {required bool isTablet}) {
                                 icon: const Icon(Icons.replay, color: Colors.white, size: 25),
                                 onPressed: () {
                                   setState(() {
-                                    offsets[index] = 0.0;
+                                    audioDelays[index] = 0.0;
                                   });
                                 },
                               ),
@@ -533,46 +635,46 @@ Widget _buildTrackTimeline(int index, {required bool isTablet}) {
                 ),
               ),
               const SizedBox(width: 12),
-              // ปุ่มปรับจังหวะละเอียด (< >)
+              
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    
+                  children: [                   
+                   
                     Container(
-                      height: 150,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
+                        height: 150,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        clipBehavior: Clip.hardEdge,
+                        child: GestureDetector(
+                        onPanUpdate: (details) {
+                          setState(() {                   
+                              audioDelays[index] += details.delta.dx / pixelsPerSecond;
+                              if (audioDelays[index] < 0) {
+                                audioDelays[index] = 0;
+                              }
+                          });
+                        },
+                    child: Stack(
+                    clipBehavior: Clip.hardEdge,
+                    children: [
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: RulerPainter(pixelsPerSecond: pixelsPerSecond, timelineScroll: timelineScroll),
+                        ),
                       ),
-                      clipBehavior: Clip.hardEdge,
-                      child: GestureDetector(
-                      onPanUpdate: (details) {
-                        setState(() {                   
-                            offsets[index] += details.delta.dx;
-                            if (offsets[index] < 0) {
-                              offsets[index] = 0;
-                            }
-                        });
-                      },
-                child: Stack(
-                  clipBehavior: Clip.hardEdge,
-                  children: [
-                    Positioned.fill(
-                      child: CustomPaint(
-                        painter: RulerPainter(),
+                      Positioned(
+                        left: visibleWaveformLeft,
+                        top: (150 - 80) / 2,
+                        child: _TwoSidedWaveformPainter(index)
                       ),
-                    ),
-                    Positioned(
-                      left: offsets[index],
-                      top: (150 - 80) / 2,
-                      child: _TwoSidedWaveformPainter(index)
-                    ),
-                  ],
-                ),
-                            ),
-                          ),
+                        ],
+                        ),
+                        ),
+                        ),
                   ],
                 ),
               )
@@ -598,17 +700,27 @@ Widget _buildTrackTimeline(int index, {required bool isTablet}) {
       ),
     );
     }
+    final duration = players[index].duration;
+    if(duration==null){
+      return const SizedBox(
+      width: 300,
+      height: 80,);}
+    final waveformWidth= duration.inMilliseconds/1000 *pixelsPerSecond;
     return SizedBox(
-      width: waveform.data.length.toDouble(),
+      width: waveformWidth,
       height: 80,
       child: CustomPaint(
           painter: TwoSidedWaveformPainter(samples:waveform.data,color:trackColors[index]),
           ),
     );
   }
+
 }
 
 class RulerPainter extends CustomPainter {
+  final double pixelsPerSecond;
+  final double timelineScroll;
+  RulerPainter({required this.pixelsPerSecond, required this.timelineScroll});
   @override
   void paint(Canvas canvas, Size size) {
 
@@ -624,7 +736,7 @@ class RulerPainter extends CustomPainter {
       ..color = Colors.grey[300]!
       ..strokeWidth = 1;
 
-    for (double i = 0; i < size.width; i += 80) {
+    for (double i = -timelineScroll%pixelsPerSecond; i < size.width; i += pixelsPerSecond) {
       canvas.drawLine(Offset(i, 0), Offset(i, 10), paint);
     }
     final middleLinePaint = Paint()
@@ -682,7 +794,7 @@ class TwoSidedWaveformPainter extends CustomPainter {
       final amplitude = normalized * (size.height / 2);
 
       path.lineTo(
-        i.toDouble(),
+        i / (samples.length - 1) * size.width,
         centerY - amplitude,
       );
     }
@@ -695,7 +807,7 @@ class TwoSidedWaveformPainter extends CustomPainter {
       final amplitude = normalized * (size.height / 2);
 
       path.lineTo(
-        i.toDouble(),
+        i / (samples.length - 1) * size.width,
         centerY + amplitude,
       );
     }

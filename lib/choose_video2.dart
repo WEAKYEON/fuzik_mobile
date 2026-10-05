@@ -673,7 +673,7 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                               ),
                             ),
                           Align(
-                            alignment: Alignment.centerLeft,
+                            alignment: Alignment.center,
                             child: Padding(
                               padding: const EdgeInsets.fromLTRB(15, 10, 15, 0),
                               child: CupertinoSlidingSegmentedControl<SlotOrientation>(
