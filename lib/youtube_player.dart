@@ -2,20 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 class YouTubeScreen extends StatefulWidget{
-  final String videourl;
-  const YouTubeScreen({super.key, required this.videourl});
+  final String youTubeurl;
+  const YouTubeScreen({super.key, required this.youTubeurl});
   @override
   State<YouTubeScreen> createState()=> _YouTubeScreenState();
 }
 
 class _YouTubeScreenState extends State<YouTubeScreen>{
   late final YoutubePlayerController controller;
+  
   bool _startvideo=false;
   
   @override
   void initState(){
     super.initState();
-    final videoId=YoutubePlayerController.convertUrlToId(widget.videourl);
+    final videoId=YoutubePlayerController.convertUrlToId(widget.youTubeurl);
     controller=YoutubePlayerController.fromVideoId(
       videoId:videoId!, 
       autoPlay: true, 

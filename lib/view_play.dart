@@ -1,37 +1,39 @@
 import 'package:flutter/material.dart';
 import 'youtube_player.dart';
+import 'httpsVideoPlayer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class ViewPlayScreen extends StatelessWidget {
   final String title;
   final String artist;
   final String views;
-  final String url;
+  final String youTubeCode;
   final String profileUrl;
   final String description;
+  final String videoUrl;
   const ViewPlayScreen({
     super.key,
     required this.title,
     required this.artist,
     required this.views,
-    required this.url,
+    required this.youTubeCode,
     required this.profileUrl,
-    required this.description
+    required this.description,
+    required this.videoUrl,
   });
-
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
 
         leading: IconButton(
           icon: const Icon(
-            Icons.arrow_back,
-            color: Colors.white,
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.yellow,
           ),
           onPressed: () => Navigator.pop(context),
         ),
@@ -45,10 +47,12 @@ class ViewPlayScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Video player mockup
-           YouTubeScreen(videourl: url),
 
-            const SizedBox(height: 20),
+            youTubeCode.isEmpty? HttpsVideoPlayer(videoUrl: videoUrl):
+            // Video player mockup
+           YouTubeScreen(youTubeurl: 'https://www.youtube.com/watch?v=$youTubeCode'),
+
+          const SizedBox(height: 20),
 
             // Video title
             Text(
@@ -65,20 +69,22 @@ class ViewPlayScreen extends StatelessWidget {
             // user
             Row(
               children: [
-                profileUrl.isNotEmpty
+                ClipRRect(
+                  borderRadius: BorderRadiusGeometry.circular(25),
+                child: profileUrl.isNotEmpty
                 ? CachedNetworkImage(
                     imageUrl: 'https://media05.fuzikapp.com/$profileUrl',
                     httpHeaders: {
                       'Referer': 'https://fuzikapp.com',
                     },
-                    width: 30,
-                    height: 30,
+                    width: 40,
+                    height: 40,
                     fit: BoxFit.cover,
                     errorWidget: (context, url, error) {
                       return const Icon(Icons.person);
                     },
                   )
-                : const Icon(Icons.person),
+                : const Icon(Icons.person), ),
                 const SizedBox(width: 6),
                 Text(
                   artist,
@@ -205,117 +211,3 @@ class ViewPlayScreen extends StatelessWidget {
     );
   }
 }
-
-//  AspectRatio(
-//               aspectRatio: 16 / 9,
-//               child: Container(
-//                 decoration: BoxDecoration(
-//                   color: const Color(0xFF151515),
-//                   borderRadius: BorderRadius.circular(12),
-//                   border: Border.all(
-//                     color: const Color(0xFFFFD600).withValues(
-//                       alpha: 0.5,
-//                     ),
-//                   ),
-//                 ),
-//                 child: Stack(
-//                   children: [
-
-//                     // Play button
-//                     Center(
-//                       child: Container(
-//                         decoration: BoxDecoration(
-//                           shape: BoxShape.circle,
-//                           color: Colors.white54,
-//                         ),
-//                         child: IconButton(
-//                           iconSize: 42,
-//                           icon: const Icon(
-//                             Icons.play_arrow,
-//                             color: Colors.black,
-//                           ),
-//                           onPressed: () {
-//                             // to Connect real video player here.
-//                           },
-//                         ),
-//                       ),
-//                     ),
-
-//                     // JAM label
-//                     Positioned(
-//                       left: 12,
-//                       top: 12,
-//                       child: Container(
-//                         padding: const EdgeInsets.symmetric(
-//                           horizontal: 10,
-//                           vertical: 5,
-//                         ),
-//                         decoration: BoxDecoration(
-//                           color: Colors.black87,
-//                           borderRadius: BorderRadius.circular(6),
-//                         ),
-//                         child: const Text(
-//                           'JAM',
-//                           style: TextStyle(
-//                             color: Colors.white,
-//                             fontSize: 11,
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                       ),
-//                     ),
-
-//                     // Mock progress bar
-//                     Positioned(
-//                       left: 12,
-//                       right: 12,
-//                       bottom: 12,
-//                       child: Column(
-//                         children: [
-//                           Container(
-//                             height: 4,
-//                             decoration: BoxDecoration(
-//                               color: Colors.white24,
-//                               borderRadius:
-//                               BorderRadius.circular(4),
-//                             ),
-//                             child: FractionallySizedBox(
-//                               alignment: Alignment.centerLeft,
-//                               widthFactor: 0.55,
-//                               child: Container(
-//                                 decoration: BoxDecoration(
-//                                   color: Colors.white54,
-//                                   borderRadius:
-//                                   BorderRadius.circular(4),
-//                                 ),
-//                               ),
-//                             ),
-//                           ),
-//                           const SizedBox(height: 6),
-//                           const Row(
-//                             mainAxisAlignment:
-//                             MainAxisAlignment.spaceBetween,
-//                             children: [
-//                               Text(
-//                                 '0:00',
-//                                 style: TextStyle(
-//                                   color: Colors.white70,
-//                                   fontSize: 11,
-//                                 ),
-//                               ),
-//                               Text(
-//                                 '0:00',
-//                                 style: TextStyle(
-//                                   color: Colors.white70,
-//                                   fontSize: 11,
-//                                 ),
-//                               ),
-//                             ],
-//                           ),
-//                         ],
-//                       ),
-//                     ),
-//                   ],
-//                 ),
-//               ),
-//             ),

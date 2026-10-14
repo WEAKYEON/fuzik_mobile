@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
+import 'package:fuzik_mobile/services/fetch_collaboration_videos.dart';
+import 'dart:async';
 import 'view_play.dart';
 import 'jam_watch.dart'; 
-import 'package:http/http.dart' as http;
-import 'package:cached_network_image/cached_network_image.dart'; //This is a package to cache the images, t
+import 'package:cached_network_image/cached_network_image.dart'; 
+import 'package:fuzik_mobile/services/fetch_videos.dart';
 
 class DashboardContent extends StatefulWidget {
   const DashboardContent({super.key});
@@ -16,55 +17,30 @@ class _DashboardContentState extends State<DashboardContent> {
   bool isSoloSelected = true; 
   final _searchController = TextEditingController();
   String _searchQuery = '';
-  MemoryImage? image;
-  Future<Map<String, List<Map<String, dynamic>>>> _fetchVideos({
-    String query = '',
-  }) async {
-    try {
-      final encodedQuery = Uri.encodeComponent(query);
+  late Future<FetchVideos> _videosFuture;
+  late Future<CollaborationVideos> _collaborationVideosFuture;
 
-      final lUri = Uri.parse(
-        'https://engine01.fuzikapp.com/play2s_l/?q=$encodedQuery',
-      );
+  void _reload() { 
 
-      final pUri = Uri.parse(
-        'https://engine01.fuzikapp.com/play2s_p/?q=$encodedQuery',
-    
-      );
-
-      final responses = await Future.wait([
-        http.get(lUri, headers:{'Referer': 'https://fuzikapp.com'}),
-        http.get(pUri, headers:{'Referer': 'https://fuzikapp.com'}),
-      ]);
-
-      final lResponse = responses[0];
-      final pResponse = responses[1];
-
-      if (lResponse.statusCode != 200 || pResponse.statusCode != 200) {
-        throw Exception('Failed to load videos');
-      }
-
-      final lData = jsonDecode(lResponse.body);
-      final pData = jsonDecode(pResponse.body);
-
-      final lvideos = List<Map<String, dynamic>>.from(lData);
-      final pvideos = List<Map<String, dynamic>>.from(pData);
-      Map<String, List<Map<String, dynamic>>> result = {
-        'landscape': lvideos,
-        'portrait': pvideos,
-      };
-      //print("Line 57: This is the result for p: ${result['portrait']}");
-      return result;
-    } catch (e) {
-      print('Error fetching videos: $e');
-      return {'landscape': [], 'portrait': []};
-    }
+  isSoloSelected? setState(() {
+     _videosFuture = fetchVideos(query: _searchQuery);
+  }) : setState(() {
+    _collaborationVideosFuture= fetchCollaborationVideos(query:_searchQuery);
+  });
   }
 
-
+  Future<void> _refresh() async{
+    final future=fetchVideos(query: _searchQuery);
+    setState((){
+      _videosFuture=future;
+    });
+    await future;
+  }
   @override
   void initState() {
     super.initState();
+    _videosFuture=fetchVideos(query: _searchQuery);
+    _collaborationVideosFuture=fetchCollaborationVideos(query: _searchQuery);
   }
   @override
   void dispose() {
@@ -79,248 +55,401 @@ class _DashboardContentState extends State<DashboardContent> {
     bool isTablet = screenWidth >= 600;
     int columns = screenWidth < 400 ? 1 : (screenWidth < 600 ? 2 : 3);
 
-    return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: paddingHorizontal, vertical: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ปุ่ม Solo / Collaboration
-          Center(
-            child: Container(
-              width: 320, height: 42,
-              decoration: BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white38),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => isSoloSelected = true),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isSoloSelected ? const Color(0xFFFFD600) : Colors.transparent,
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text('Solo', style: TextStyle(color: isSoloSelected ? Colors.black : Colors.white, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => isSoloSelected = false),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: !isSoloSelected ? const Color(0xFFFFD600) : Colors.transparent,
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text('Collaboration', style: TextStyle(color: !isSoloSelected ? Colors.black : Colors.white, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // ช่องค้นหา (Search)
-          Center(
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 550),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 40,
-                      child: TextField(
-                        controller: _searchController,
-                        style: const TextStyle(color: Colors.white, fontSize: 14),
-                        decoration: InputDecoration(
-                          hintText: 'Search by song, artist, or instrument',
-                          hintStyle: const TextStyle(color: Colors.white38, fontSize: 14),
-                          filled: true, fillColor: Colors.black,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                          enabledBorder: OutlineInputBorder(borderSide: const BorderSide(color: Color(0xFFFFD600)), borderRadius: BorderRadius.circular(20)),
-                          focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: Color(0xFFFFD600), width: 2), borderRadius: BorderRadius.circular(20)),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  SizedBox(
-                    height: 40,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          _searchQuery = _searchController.text.trim();
-                        });
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFFD600), foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        padding: const EdgeInsets.symmetric(horizontal: 28),
-                      ),
-                      child: const Text('Search', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 40),
-          
-          isSoloSelected?Text("Portrait", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)):Container(),
-          const SizedBox(height: 16),
-
-          //Portrait Videos
-          isSoloSelected?FutureBuilder<Map<String, List<Map<String, dynamic>>>>(
-          future: _fetchVideos(query: _searchQuery), 
-          builder: (context,snapshot){
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Color(0xFFFFD600))));
-            }
-            if (!snapshot.hasData || snapshot.data!.isEmpty || snapshot.data!['portrait']!.isEmpty) {
-              return  Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text('Sorry, we could not find any portrait videos with $_searchQuery.', style: TextStyle(color: Colors.white54, fontSize: 16))));
-            }
-            final videos = snapshot.data!['portrait']!;
-            return SizedBox(
-              width: MediaQuery.of(context).size.width*0.8,
-              child: GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: isTablet?4:3, 
-                  crossAxisSpacing: 5, 
-                  mainAxisSpacing: 10, 
-                  childAspectRatio: 0.4, 
+    return RefreshIndicator(
+      backgroundColor: Colors.yellow,
+      color:Colors.black,
+      onRefresh: _refresh,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.symmetric(horizontal: paddingHorizontal, vertical: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ปุ่ม Solo / Collaboration
+            Center(
+              child: Container(
+                width: 320, height: 42,
+                decoration: BoxDecoration(
+                  color: Colors.black,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.white38),
                 ),
-                itemCount: videos.length,
-                itemBuilder: (context, index) {
-                  final video = videos[index];
-              
-                  final title = video['video_title']?.toString() ?? '';
-                  final artist = video['musician_name']?.toString() ?? '';
-                  final views = '${video['views'] ?? 0} views';
-                  final preview = video['preview']?.toString()??'';
-                  final profileUrl = video['musician_profile_pic']?.toString() ?? '';
-                  final youtubeCode=video['youtube_url'];
-                  final sampleurl='https://www.youtube.com/watch?v=$youtubeCode';
-                  final description=video['description']?.toString() ??'';
-                  return _buildVideoCard(
-                    title,
-                    artist,
-                    views,
-                    preview,
-                    profileUrl,
-                    isSolo: isSoloSelected,
-                    isPortrait: true,
-                    onTap: () {
-                      if (isSoloSelected) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ViewPlayScreen(
-                              title: title,
-                              artist: artist,
-                              views: views,
-                              url: sampleurl,
-                              profileUrl: profileUrl,
-                              description:description
-                            ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => isSoloSelected = true),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: isSoloSelected ? const Color(0xFFFFD600) : Colors.transparent,
+                            borderRadius: BorderRadius.circular(24),
                           ),
-                        );
-                      } else {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const JamWatchScreen(),
+                          alignment: Alignment.center,
+                          child: Text('Solo', style: TextStyle(color: isSoloSelected ? Colors.black : Colors.white, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => isSoloSelected = false),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: !isSoloSelected ? const Color(0xFFFFD600) : Colors.transparent,
+                            borderRadius: BorderRadius.circular(24),
                           ),
-                        );
-                      }
-                    },
-                  );
-                },
+                          alignment: Alignment.center,
+                          child: Text('Collaboration', style: TextStyle(color: !isSoloSelected ? Colors.black : Colors.white, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            );
-          }
-          ):Container(),
-          Text(isSoloSelected ? 'Landscape' : 'Group', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          // ตารางวิดีโอ (GridView)
-          FutureBuilder<Map<String, List<Map<String, dynamic>>>>(
-            future: _fetchVideos(query: _searchQuery),
-            builder: (context, snapshot) {
+            ),
+            const SizedBox(height: 24),
+      
+            // ช่องค้นหา (Search)
+            Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 550),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 40,
+                        child: TextField(
+                          controller: _searchController,
+                          style: const TextStyle(color: Colors.white, fontSize: 14),
+                          decoration: InputDecoration(
+                            hintText: 'Search by song, artist, or instrument',
+                            hintStyle: const TextStyle(color: Colors.white38, fontSize: 14),
+                            filled: true, fillColor: Colors.black,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                            enabledBorder: OutlineInputBorder(borderSide: const BorderSide(color: Color(0xFFFFD600)), borderRadius: BorderRadius.circular(20)),
+                            focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: Color(0xFFFFD600), width: 2), borderRadius: BorderRadius.circular(20)),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      height: 40,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _searchQuery = _searchController.text.trim();
+                            _videosFuture=fetchVideos(query: _searchQuery);
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFFD600), foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          padding: const EdgeInsets.symmetric(horizontal: 28),
+                        ),
+                        child: const Text('Search', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 40),
+            
+            isSoloSelected?Text("Portrait", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)):Container(),
+            const SizedBox(height: 16),
+      
+            //Portrait Videos
+            isSoloSelected?FutureBuilder<FetchVideos>(
+            future: _videosFuture,
+            builder: (context,snapshot){
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Color(0xFFFFD600))));
               }
-              if (!snapshot.hasData || snapshot.data!.isEmpty || snapshot.data!['landscape']!.isEmpty) {
-                return  Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text('Sorry, we could not find any landscape videos with $_searchQuery.', style: TextStyle(color: Colors.white54, fontSize: 16))));
-              }
-              final videos = snapshot.data!['landscape']!;
-              return GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: columns, 
-                  crossAxisSpacing: 16, 
-                  mainAxisSpacing: 10, 
-                  childAspectRatio: columns == 1 ? 1.5 : 1.0, 
+             if(!snapshot.hasData || snapshot.data!.hasError ){
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(40),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        snapshot.data?.error ?? 'Something went wrong.',
+                        style: const TextStyle(color: Colors.white54, fontSize: 16),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton(
+                        style:ElevatedButton.styleFrom(
+                          backgroundColor: Colors.yellow,
+                          foregroundColor: Colors.black
+                        ) ,
+                        onPressed: _reload, child: const Text('Retry')),
+                    ],
+                  ),
                 ),
-                itemCount: videos.length,
-                itemBuilder: (context, index) {
-                  final video = videos[index];
-
-                  final title = video['video_title']?.toString() ?? '';
-                  final artist = video['musician_name']?.toString() ?? '';
-                  final views = '${video['view_count'] ?? 0} views';
-                  final preview = video['preview']?.toString()??'';
-                  final profileUrl = video['musician_profile_pic']?.toString() ?? '';
-                  final youtubeCode=video['youtube_url'];
-                  final sampleurl='https://www.youtube.com/watch?v=$youtubeCode';
-                  final description = video['description']?.toString()??'';
-                  return _buildVideoCard(
-                    title,
-                    artist,
-                    views,
-                    preview,
-                    profileUrl,
-                    isPortrait: false,
-                    isSolo: isSoloSelected,
-                    onTap: () {
-                      if (isSoloSelected) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ViewPlayScreen(
-                              title: title,
-                              artist: artist,
-                              views: views,
-                              url:sampleurl,
-                              profileUrl: profileUrl,
-                              description: description,
+              ); 
+             }
+              if (snapshot.data!.portrait.isEmpty) {
+                return  Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text('Sorry, we could not find any portrait videos with $_searchQuery.', style: TextStyle(color: Colors.white54, fontSize: 16))));
+              }
+              final videos = snapshot.data!.portrait;
+              return SizedBox(
+                width: MediaQuery.of(context).size.width*0.8,
+                child: GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: isTablet?4:3, 
+                    crossAxisSpacing: 5, 
+                    mainAxisSpacing: 10, 
+                    childAspectRatio: 0.4, 
+                  ),
+                  itemCount: videos.length,
+                  itemBuilder: (context, index) {
+                    final video = videos[index];
+                
+                    final title = video['video_title']?.toString() ?? '';
+                    final artist = video['musician_name']?.toString() ?? '';
+                    final views = '${video['views'] ?? 0} views';
+                    final preview = video['preview']?.toString()??'';
+                    final profileUrl = video['musician_profile_pic']?.toString() ?? '';
+                    final youtubeCode=video['youtube_url'];
+                    final videoUrl=video['url']?.toString() ??'';
+                    final description=video['description']?.toString() ??'';
+                    
+                    return _buildVideoCard(
+                      title,
+                      artist,
+                      views,
+                      preview,
+                      profileUrl,
+                      isSolo: isSoloSelected,
+                      isPortrait: true,
+                      onTap: () {
+                        if (isSoloSelected) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ViewPlayScreen(
+                                title: title,
+                                artist: artist,
+                                views: views,
+                                youTubeCode: youtubeCode,
+                                profileUrl: profileUrl,
+                                description:description,
+                                videoUrl: videoUrl,
+                              ),
                             ),
-                          ),
-                        );
-                      } else {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const JamWatchScreen(),
-                          ),
-                        );
-                      }
-                    },
-                  );
-                },
+                          );
+                        } else {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const JamWatchScreen(),
+                            ),
+                          );
+                        }
+                      },
+                    );
+                  },
+                ),
               );
-            },
-          ),
-         
-        ],
+            }
+            ):Container(),
+
+            Text(isSoloSelected ? 'Landscape' : 'Jam', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            // Landscape
+            isSoloSelected? FutureBuilder<FetchVideos>(
+              future: _videosFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Color(0xFFFFD600))));
+                }
+               if(!snapshot.hasData || snapshot.data!.hasError ){
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(40),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            snapshot.data?.error ?? 'Something went wrong.',
+                            style: const TextStyle(color: Colors.white54, fontSize: 16),
+                          ),
+                          const SizedBox(height: 12),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.yellow,
+                              foregroundColor: Colors.black
+                            ),
+                            onPressed: _reload, child: const Text('Retry')),
+                        ],
+                      ),
+                    ),
+                  ); 
+                }
+                if (snapshot.data!.landscape.isEmpty) {
+                  return  Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text('Sorry, we could not find any landscape videos with $_searchQuery.', style: TextStyle(color: Colors.white54, fontSize: 16))));
+                }
+                final videos = snapshot.data!.landscape;
+                return GridView.builder(  
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns, 
+                    crossAxisSpacing: 16, 
+                    mainAxisSpacing: 10, 
+                    childAspectRatio: columns == 1 ? 1.5 : 1.0, 
+                  ),
+                  itemCount: videos.length,
+                  itemBuilder: (context, index) {
+                    final video = videos[index];
+      
+                    final title = video['video_title']?.toString() ?? '';
+                    final artist = video['musician_name']?.toString() ?? '';
+                    final views = '${video['view_count'] ?? 0} views';
+                    final preview = video['preview']?.toString()??'';
+                    final profileUrl = video['musician_profile_pic']?.toString() ?? '';
+                    final youtubeCode=video['youtube_url'];
+                    final description = video['description']?.toString()??'';
+                    final videoUrl=video['url']?.toString()??'';
+                    return _buildVideoCard(
+                      title,
+                      artist,
+                      views,
+                      preview,
+                      profileUrl,
+                      isPortrait: false,
+                      isSolo: isSoloSelected,
+                      onTap: () {
+                        if (isSoloSelected) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ViewPlayScreen(
+                                title: title,
+                                artist: artist,
+                                views: views,
+                                youTubeCode :youtubeCode,
+                                profileUrl: profileUrl,
+                                description: description,
+                                videoUrl: videoUrl,
+                              ),
+                            ),
+                          );
+                        } else {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const JamWatchScreen(),
+                            ),
+                          );
+                        }
+                      },
+                    );
+                  },
+                );
+              },
+            ): Container(),
+           
+           //Collaboration Videos
+           isSoloSelected?Container()
+           :FutureBuilder<CollaborationVideos>(
+            future: _collaborationVideosFuture,
+            builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Color(0xFFFFD600))));
+                }
+               if(!snapshot.hasData || snapshot.data!.hasError ){
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(40),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            snapshot.data?.error ?? 'Something went wrong.',
+                            style: const TextStyle(color: Colors.white54, fontSize: 16),
+                          ),
+                          const SizedBox(height: 12),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.yellow,
+                              foregroundColor: Colors.black
+                            ),
+                            onPressed: _reload, child: const Text('Retry')),
+                        ],
+                      ),
+                    ),
+                  ); 
+                }
+                if (snapshot.data!.videos.isEmpty) {
+                  return  Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text('Sorry, we could not find any jam videos with $_searchQuery.', style: TextStyle(color: Colors.white54, fontSize: 16))));
+                }
+                final videos = snapshot.data!.videos;
+                return GridView.builder(  
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns, 
+                    crossAxisSpacing: 16, 
+                    mainAxisSpacing: 10, 
+                    childAspectRatio: columns == 1 ? 1.5 : 1.0, 
+                  ),
+                  itemCount: videos.length,
+                  itemBuilder: (context, index) {
+                    final video = videos[index];
+      
+                    final title = video['description']?.toString() ?? '';
+                    final artist = video['owner_name']?.toString() ?? '';
+                    final views = '${video['view_count'] ?? 0} views';
+                    final previewUrl = video['preview']?.toString()??'';
+                    final profileUrl = video['profile_pic']?.toString() ?? '';
+                    final youtubeCode=video['youtube_url']??'';
+                    final description = video['description']?.toString()??'';
+                    final videoUrl=video['url']?.toString()??'';
+
+                    final preview='https://media05.fuzikapp.com/$previewUrl';
+                    return _buildVideoCard(
+                      title,
+                      artist,
+                      views,
+                      preview,
+                      profileUrl,
+                      isPortrait: false,
+                      isSolo: isSoloSelected,
+                      onTap: () {
+                        if (isSoloSelected) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ViewPlayScreen(
+                                title: title,
+                                artist: artist,
+                                views: views,
+                                youTubeCode:youtubeCode,
+                                profileUrl: profileUrl,
+                                description: description,
+                                videoUrl: videoUrl,
+                              ),
+                            ),
+                          );
+                        } else {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const JamWatchScreen(),
+                            ),
+                          );
+                        }
+                      },
+                    );
+                  },
+                );
+              },
+           )
+          ],
+        ),
       ),
     );
   }
@@ -330,11 +459,13 @@ class _DashboardContentState extends State<DashboardContent> {
       String artist,
       String views,
       String preview,
-      String profileUrl, {
+      String profileUrl,{
         required bool isPortrait,
         required bool isSolo,
         VoidCallback? onTap,
+        int retry = 0,
       }) {
+    
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -356,14 +487,21 @@ class _DashboardContentState extends State<DashboardContent> {
                 children: [
                    ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                     child: CachedNetworkImage(
+                    child: CachedNetworkImage(
                         imageUrl: preview,
                         fit:BoxFit.cover,
                         width: double.infinity,
                         height: double.infinity,
                         placeholder: (context, url) => Center(child: CircularProgressIndicator(color:Colors.yellow)),
-                        errorWidget: (context, url, error) => Icon(Icons.error),
-                                       ),
+                        errorWidget: (context, url, error) => GestureDetector(
+                          onTap: () async {
+                            await CachedNetworkImage.evictFromCache(url);
+                            setState(() => retry++);
+                          },
+                          child: const Icon(Icons.refresh),
+                        ),
+                        ),
+                    
                    ),
 
                   Positioned(

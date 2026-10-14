@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
 import 'package:ffmpeg_kit_flutter_new_audio/ffmpeg_kit.dart';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:just_waveform/just_waveform.dart';
 
 class AdjustTimelineScreen extends StatefulWidget {
@@ -23,17 +24,47 @@ class AdjustTimelineScreen extends StatefulWidget {
 }
 
 class _AdjustTimelineScreenState extends State<AdjustTimelineScreen> {
-  final List<Color> trackColors = [Colors.cyanAccent, Colors.blueAccent, Colors.greenAccent, Colors.orangeAccent];
+  final List<Color> trackColors = [const Color(0xFFFFFF12), Colors.yellow, Colors.yellow, Colors.yellow];
   late List<AudioPlayer> players;
   late List<Waveform?> waveforms;
   bool isMasterPlaying=false;
   double zoom = 1.0;
-  double get pixelsPerSecond => 60.0 * zoom;
+  double get pixelsPerSecond => 120.0 * zoom;
   late List<double> audioDelays;
+  late List<double> volumes;
+  late List<int> _playTokens;   // bump a track's token to cancel its pending start
+  late List<bool> _waiting; 
   double timelineScroll=0.0;
+  double _viewportWidth=300;
+  late List<int> wavePeaks;
+  static const double _badgeColumnWidth = 44;
+  static const double _listPadding = 16; // the ListView's padding
+  static const double _gapAfterBadge = 20;
+  static const double _gapAfterThumb = 12;
+  late List<bool> _volumeOpen;
+  double guideSeconds=1.0;
+  double get _guideX=> guideSeconds*pixelsPerSecond;
+  bool get _anythingActive =>players.any((p) => p.playing) || _waiting.any((w) => w);
+  double _thumbWidth(bool isTablet) => isTablet ? 200 : 100;
 
-double get maxTimelineWidth {
-  double maxWidth = 0.0;
+  double _scrollbarLeft(bool isTablet) =>
+      _listPadding + _badgeColumnWidth + _gapAfterBadge +
+      _thumbWidth(isTablet) + _gapAfterThumb;
+
+int computePeak(Waveform w) {
+  int peak = 1;
+  for (int i = 0; i < w.length; i++) {
+    peak = math.max(
+      peak,
+      math.max(w.getPixelMax(i).abs(), w.getPixelMin(i).abs()),
+    );
+  }
+  return peak;
+}
+
+double get maxScroll =>(maxTimelineWidth - _viewportWidth).clamp(0.0, double.infinity);
+  double get maxTimelineWidth {
+    double maxWidth = 0.0;
 
   for (int i = 0; i < players.length; i++) {
     final duration = players[i].duration;
@@ -55,10 +86,6 @@ double get maxTimelineWidth {
   }
 
   return maxWidth;
-}
-
-void set maxTimelineWidth(double value) {
-  maxTimelineWidth = value;
 }
 
 Future<File> getCachedAudio(String videoCode, String videoUrl) async{
@@ -99,31 +126,8 @@ Future<File> getCachedAudio(String videoCode, String videoUrl) async{
       }
       return audioFile;
       }
+    if (await audioFile.exists()) await audioFile.delete();
     throw Exception('getCachedAudio: FFmpeg failed to extract audio');
-}
-
-//Play a single track
-Future<void> playTrack(int index, {double secondsDelay=0.0}) async {
-  final player = players[index];
-  final delay = secondsDelay;
-
-  if (delay > 0) {
-    await Future.delayed(
-      Duration(
-        milliseconds: (delay * 1000).round(),
-      ),
-    );
-    await player.seek(Duration.zero);
-  } else if (delay < 0) {
-    await player.seek(
-      Duration(
-        milliseconds: (-delay * 1000).round(),
-      ),
-    );
-  } else {
-    await player.seek(Duration.zero);
-  }
-  await player.play();
 }
 
 Future<void> _initializeAudio() async{
@@ -157,65 +161,86 @@ Future<void> _initializeAudio() async{
     }
   }
 
-Future<void> togglePlay(int index, double secondsDelay)async{
-    final player=players[index];
-    await player.setLoopMode(LoopMode.off);
-    if(player.processingState==ProcessingState.completed){
-      await player.seek(Duration.zero);
-    }
-    if(player.playing){
-      await player.pause();
-      return;
-    }
-    await playTrack(index, secondsDelay:secondsDelay);
+void _cancelPending(int i) {
+  _playTokens[i]++;
+  _waiting[i] = false;
+}
+
+// Master icon = "is anything playing or about to play"
+void _syncMasterIcon() {
+  if (!mounted) return;
+  setState(() {
+    isMasterPlaying =
+        players.any((p) => p.playing) || _waiting.any((w) => w);
+  });
+}
+
+Future<void> playTrack(int index, {double secondsDelay = 0.0}) async {
+  final player = players[index];
+  if (player.duration == null) return;        // audio failed to load / not ready
+
+  final token = ++_playTokens[index];         // also cancels any older pending start
+
+  if (secondsDelay > 0) {
+    _waiting[index] = true;
+    await Future.delayed(Duration(milliseconds: (secondsDelay * 1000).round()));
+    if (!mounted || token != _playTokens[index]) return;  // cancelled
+    _waiting[index] = false;
   }
+
+  await player.seek(Duration.zero);
+  if (!mounted || token != _playTokens[index]) return;
+  await player.play();
+}
+
+Future<void> togglePlay(int index, double secondsDelay) async {
+  final player = players[index];
+  if (player.playing || _waiting[index]) {
+    _cancelPending(index);
+    await player.pause();
+    _syncMasterIcon();
+    return;
+  }
+  await playTrack(index, secondsDelay: secondsDelay);
+}
 
 Future<void> playAllTracks() async {
   setState(() {
-    isMasterPlaying=true;
+    isMasterPlaying = true;
   });
-  await Future.wait(
-    List.generate(
-      players.length,
-      (i) => playTrack(i),
-    ),
-  );
+  await Future.wait(List.generate(
+    players.length,
+    (i) => playTrack(i, secondsDelay: audioDelays[i]),
+  ));
+  _syncMasterIcon(); // all finished, paused or cancelled
 }
 
 Future<void> pauseAllTracks() async {
-  for (final player in players) {
-    await player.pause();
+  for (int i = 0; i < players.length; i++) {
+    _cancelPending(i);
   }
-  setState(() {
-    isMasterPlaying = false;
-  });
+  await Future.wait(players.map((p) => p.pause()));
+  _syncMasterIcon();
 }
 
 Future<void> startOver(int index) async {
+  _cancelPending(index);
   final player = players[index];
-
+  if (player.duration == null) return;
   await player.seek(Duration.zero);
   await player.play();
 }
 
-Future<void> startOverAllTracks()async{
-  for (final player in players){
-    await player.seek(Duration.zero);
+// Rewind only, no autoplay
+Future<void> startOverAllTracks() async {
+  for (int i = 0; i < players.length; i++) {
+    _cancelPending(i);
   }
+  await Future.wait(players.map((p) => p.pause()));
+  await Future.wait(players.map((p) => p.seek(Duration.zero)));
+  _syncMasterIcon(); // now false, since nothing is playing
 }
 
-  @override
-  void initState(){
-    super.initState();
-    audioDelays = List<double>.filled(widget.selectedVideos.length, 0.0);
-    players = List.generate(widget.selectedVideos.length, 
-    (_)=>AudioPlayer());
-    waveforms = List<Waveform?>.filled(
-      widget.selectedVideos.length,
-      null,
-    );
-    _initializeAudio();
-  }
 
 Future<void> generateWaveform(
   int index,
@@ -228,7 +253,7 @@ Future<void> generateWaveform(
       '${cacheDir.path}/${widget.selectedVideos[index]['url']}.wave',
     );
 
-    print('Generating waveform for track $index...');
+    debugPrint('Generating waveform for track $index...');
 
     final progressStream = JustWaveform.extract(
       audioInFile: audioFile,
@@ -243,6 +268,7 @@ Future<void> generateWaveform(
 
         setState(() {
           waveforms[index] = progress.waveform;
+          wavePeaks[index]=computePeak(progress.waveform!);
         });
 
         print('Waveform ready for track ${index+1}');
@@ -256,8 +282,36 @@ Future<void> generateWaveform(
 }
 
 @override
-void dispose(){
-  for (final player in players){
+  void initState(){
+    super.initState();
+    audioDelays = List<double>.filled(widget.selectedVideos.length, 0.0);
+    players = List.generate(widget.selectedVideos.length, 
+    (_)=>AudioPlayer());
+    waveforms = List<Waveform?>.filled(
+      widget.selectedVideos.length,
+      null,
+    );
+    _playTokens = List<int>.filled(widget.selectedVideos.length, 0);
+    _waiting = List<bool>.filled(widget.selectedVideos.length, false);
+    wavePeaks = List<int>.filled(widget.selectedVideos.length, 1);
+    volumes = List<double>.filled(widget.selectedVideos.length, 1.0);
+    _initializeAudio();
+
+    for (final p in players) {
+      p.processingStateStream.listen((state) async {
+        if (state != ProcessingState.completed) return;
+        await p.pause();
+        _syncMasterIcon();
+      });
+    }
+    _volumeOpen=List.filled(widget.selectedVideos.length, false);
+  }
+@override
+void dispose() {
+  for (int i = 0; i < _playTokens.length; i++) {
+    _playTokens[i]++;
+  }
+  for (final player in players) {
     player.dispose();
   }
   super.dispose();
@@ -295,7 +349,7 @@ void dispose(){
                       inactiveColor: Colors.yellowAccent.withValues(alpha: 0.2),
                       thumbColor: Colors.yellow,
                       overlayColor: WidgetStateProperty.all(Colors.yellow.withValues(alpha: 0.2)),
-                      min: 0.5,
+                      min: 1.0,
                       max: 4.0, 
                       divisions:7,
                       label:'${zoom.toStringAsFixed(1)}x',             
@@ -303,110 +357,80 @@ void dispose(){
                       onChanged: (value) {
                         setState(() {
                           zoom = value;
+                          timelineScroll=timelineScroll.clamp(0.0, maxScroll);
                         });
                       },
-                                 ),
+                    ),
                    ),
                  ],
                ),
              ),
-              LayoutBuilder(
-                builder:(context, constraints) {
-                final viewportWidth = constraints.maxWidth;
-                final maxScroll = (maxTimelineWidth - viewportWidth).clamp(0.0, double.infinity);  
-                return Column(
+             Container(
+              width:120,
+              decoration: BoxDecoration(
+                color:Colors.grey[850],
+                borderRadius: BorderRadius.circular(20)
+              ),
+              
+               child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    SizedBox(
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: widget.selectedVideos.length, // จำนวนวิดีโอ
-                        padding: const EdgeInsets.all(16.0),
-                        itemBuilder: (context, index) {
-                          return _buildTrackTimeline(index, isTablet: isTablet);
-                        },
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: Icon(
+                        isMasterPlaying?
+                        Icons.pause
+                        :Icons.play_arrow,
+                        color: Colors.white,
+                        size: 28,
                       ),
+                      onPressed: isMasterPlaying? pauseAllTracks:playAllTracks,
                     ),
+                    const SizedBox(width: 10),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.skip_previous,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                      onPressed: ()async{
+                        startOverAllTracks();
+                      },
+                    ),
+                  ],
+                ),
+             ),
+                Column(
+                  children: [
+                       Stack(
+                         children: [ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: widget.selectedVideos.length, // จำนวนวิดีโอ
+                          padding: const EdgeInsets.all(16.0),
+                          itemBuilder: (context, index) {
+                            return _buildTrackTimeline(index, isTablet: isTablet);
+                          },
+                          ),
+                           _alignmentBar(isTablet),
+                         ]
+                       ),
+                    
 
                     //Slider for timeline scroll
                     Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                        trackHeight: 8.0, // Thicker track
-                        activeTrackColor: Colors.yellow[500],
-                        inactiveTrackColor: Colors.yellowAccent.withValues(alpha: 0.2),
-                        thumbColor: Colors.yellow, // Custom thumb color
-                        overlayColor: Colors.yellow.withValues(alpha: 0.2), // Splash ripple color when pressed
-                        valueIndicatorColor: Colors.indigo,
-                        thumbShape: RoundSliderThumbShape(enabledThumbRadius: 14.0), // Bigger thumb
-                        overlayShape: RoundSliderOverlayShape(overlayRadius: 28.0),
-                      ),
-                      child: Slider(
-                        min: 0,
-                        max: maxScroll > 0 ? maxScroll : 1,
-                        value: timelineScroll.clamp(
-                          0.0,
-                          maxScroll 
-                        ),
-                        onChanged: maxScroll > 0
-                            ? (value) {
-                                setState(() {
-                                  timelineScroll = value;
-                                });
-                              }
-                            : null,
+                      padding: EdgeInsets.only(left: _scrollbarLeft(isTablet), right: _listPadding),
+                      child: TimelineScrollbar(
+                        contentWidth: maxTimelineWidth,
+                        viewportWidth: _viewportWidth,
+                        offset: timelineScroll,
+                        onChanged: (v) => setState(() => timelineScroll = v),
                       ),
                     ),
-                  ),
                   ],
-                );}
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 35,
-                    height: 35,
-                    decoration: BoxDecoration(
-                      color: Color.fromARGB(255, 44, 43, 43),
-                      borderRadius: BorderRadius.circular(25),
-                      boxShadow: [
-                        BoxShadow(
-                          color:  Colors.yellow.withValues(alpha: 0.7),
-                          blurRadius: 10,
-                          spreadRadius: 2
-                        )
-                      ]
-                    ),
-                    child: Center(
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        icon: Icon(
-                          isMasterPlaying?
-                          Icons.pause
-                          :Icons.play_arrow,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                        onPressed: isMasterPlaying? pauseAllTracks:playAllTracks,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(width: 16),
-
-                  IconButton(
-                    icon: const Icon(
-                      Icons.skip_previous,
-                      color: Colors.white,
-                      size: 32,
-                    ),
-                    onPressed: ()async{
-                      startOverAllTracks();
-                    },
-                  ),
-                ],
-              ),
+                ),
+              
+              
               const SizedBox(height: 40,),
               Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -515,38 +539,41 @@ Widget _buildTrackTimeline(int index, {required bool isTablet}) {
         children: [
           Row(
             children: [
-              Column(
-                children: [
-                  Container(
-                    width: 35,
-                    height: 35,
-                    decoration: BoxDecoration(
-                      color: Colors.yellow,
-                      borderRadius: BorderRadius.circular(25),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.yellow.withValues(alpha: 0.9),
-                          blurRadius: 10,
-                          spreadRadius: 2
+              SizedBox(
+                width: _badgeColumnWidth,
+                child: Column(
+                  children: [
+                    Container(
+                      width: 35,
+                      height: 35,
+                      decoration: BoxDecoration(
+                        color: Colors.yellow,
+                        borderRadius: BorderRadius.circular(25),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.yellow.withValues(alpha: 0.9),
+                            blurRadius: 10,
+                            spreadRadius: 2
+                          )
+                        ]
+                      ),
+                      child: Center(
+                        child: Text('${index+1}', style: TextStyle(color:Colors.black, fontWeight: FontWeight.bold, fontSize: 15),
                         )
-                      ]
-                    ),
-                    child: Center(
-                      child: Text('${index+1}', style: TextStyle(color:Colors.black, fontWeight: FontWeight.bold, fontSize: 15),
                       )
-                    )
-                    ),
-                    SizedBox(width: 10,height: 10,),
-                    durationInSeconds == null
-                      ? const Text(
-                          'Loading',
-                          style: TextStyle(color: Colors.white),
-                        )
-                      : Text(
-                          '${durationInSeconds ~/ 60}:${(durationInSeconds % 60).toString().padLeft(2, '0')}',
-                          style: const TextStyle(color: Colors.white),
-                        )
-                ],
+                      ),
+                      SizedBox(width: 10,height: 10,),
+                      durationInSeconds == null
+                        ? const Text(
+                            'Loading',
+                            style: TextStyle(color: Colors.white),
+                          )
+                        : Text(
+                            '${durationInSeconds ~/ 60}:${(durationInSeconds % 60).toString().padLeft(2, '0')}',
+                            style: const TextStyle(color: Colors.white),
+                          )
+                  ],
+                ),
               ),
               SizedBox(width: 20,),
               Container(
@@ -588,7 +615,7 @@ Widget _buildTrackTimeline(int index, {required bool isTablet}) {
                                 stream: players[index].playerStateStream,
                                 builder: (context, snapshot) {
                                   final playerState = snapshot.data;
-                                  final isPlaying = playerState?.playing ?? false;
+                                  final isPlaying = (playerState?.playing ?? false) && playerState?.processingState!=ProcessingState.completed;
                                   return IconButton(
                                       icon: Icon(
                                         isPlaying ? Icons.pause : Icons.play_arrow,
@@ -634,48 +661,111 @@ Widget _buildTrackTimeline(int index, {required bool isTablet}) {
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
-              
+              const SizedBox(width: 12), 
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [                   
-                   
-                    Container(
-                        height: 150,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        clipBehavior: Clip.hardEdge,
-                        child: GestureDetector(
-                        onPanUpdate: (details) {
-                          setState(() {                   
-                              audioDelays[index] += details.delta.dx / pixelsPerSecond;
-                              if (audioDelays[index] < 0) {
-                                audioDelays[index] = 0;
-                              }
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    if (constraints.maxWidth - _viewportWidth.abs()>0.5) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if(mounted){
+                          setState(() {
+                            _viewportWidth=constraints.maxWidth;
                           });
-                        },
-                    child: Stack(
-                    clipBehavior: Clip.hardEdge,
-                    children: [
-                      Positioned.fill(
-                        child: CustomPaint(
-                          painter: RulerPainter(pixelsPerSecond: pixelsPerSecond, timelineScroll: timelineScroll),
+                        }
+                      });
+                    }
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [                                
+                        Container(
+                          height: 150,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          clipBehavior: Clip.hardEdge,
+                          child: GestureDetector(
+                            onPanStart: (_){
+                              if(_anythingActive) pauseAllTracks();
+                            },
+                          onPanUpdate: (details) {
+                            setState(() {                   
+                                audioDelays[index] += details.delta.dx / pixelsPerSecond;
+                                if (audioDelays[index] < 0) {
+                                  audioDelays[index] = 0;
+                                }
+                            });
+                          },
+                      child: Stack(
+                      clipBehavior: Clip.hardEdge,
+                      children: [
+                        Positioned.fill(
+                          child: CustomPaint(
+                            painter: RulerPainter(pixelsPerSecond: pixelsPerSecond, timelineScroll: timelineScroll),
+                          ),
                         ),
-                      ),
-                      Positioned(
-                        left: visibleWaveformLeft,
-                        top: (150 - 80) / 2,
-                        child: _TwoSidedWaveformPainter(index)
-                      ),
-                        ],
+                        Positioned(
+                          left: visibleWaveformLeft,
+                          top: (150 - 80) / 2,
+                          child: BarWaves(index)
                         ),
-                        ),
-                        ),
-                  ],
+                        Positioned(
+                          top:10,
+                          right:10,
+                          child: AnimatedContainer(
+                            duration:Duration(milliseconds: 200),
+                            //padding: EdgeInsets.fromLTRB(10,10,10,10),
+                            curve: Curves.easeOut,
+                            decoration: BoxDecoration(
+                              color:Colors.black,
+                              borderRadius: BorderRadius.circular(30)
+                            ),
+                            width:_volumeOpen[index]?220:50,
+                            height: 50,
+                            clipBehavior: Clip.hardEdge,
+                            child: Row(
+                              children: [
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.volume_up_rounded,size:30
+                                  ),
+                                  onPressed: (){
+                                    setState(() {
+                                     _volumeOpen[index]=!_volumeOpen[index];
+                                    });
+                                  },
+                                ),
+                                Expanded(
+                                  child: SliderTheme(
+                                    data: SliderTheme.of(context).copyWith(
+                                      trackHeight: 1,
+                                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8), 
+                                    ),
+                                    child: Slider(
+                                      padding:EdgeInsets.only(right:20),
+                                      activeColor: Colors.white,                         
+                                      min: 0,
+                                      max: 1,
+                                      value: volumes[index],
+                                      onChanged: (v) {
+                                        setState(() {
+                                          volumes[index] = v;
+                                        });
+                                        players[index].setVolume(v);
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),)
+                          ],
+                          ),
+                          ),
+                          ),
+                    ],
+                  );}
                 ),
               )
             ],
@@ -686,8 +776,79 @@ Widget _buildTrackTimeline(int index, {required bool isTablet}) {
     );
   }
 
+Widget _alignmentBar(bool isTablet) {
+  // Absolute X position on the full timeline.
+  final rawX = _guideX;
+
+  // Convert timeline coordinates to visible viewport coordinates.
+  final visibleX = rawX - timelineScroll;
+
+  // Keep the alignment bar visible at the viewport edges.
+  final maxVisibleX =(_viewportWidth - 2.0).clamp(0.0, double.infinity);
+
+  final x = visibleX.clamp(0.0, maxVisibleX).toDouble();
+
+  // Fade the bar when its actual timeline position is outside
+  // the visible viewport.
+  final offscreen =visibleX < 0 || visibleX > maxVisibleX;
+
+  return Positioned(
+    left: _scrollbarLeft(isTablet) + x - 20,
+    top: 0,
+    bottom: 0,
+    width: 40,
+    child: GestureDetector(
+      behavior: HitTestBehavior.translucent,
+
+      onHorizontalDragUpdate: (d) {
+        setState(() {
+          // Move relative to the bar's displayed position.
+          final newX = (x + d.delta.dx)
+              .clamp(0.0, _viewportWidth)
+              .toDouble();
+
+          // Convert the visible position back into timeline time.
+          guideSeconds =
+              (newX + timelineScroll) / pixelsPerSecond;
+        });
+      },
+
+      child: Opacity(
+        opacity: offscreen ? 0.4 : 1.0,
+        child: Stack(
+          alignment: Alignment.topCenter,
+          children: [
+            Center(
+              child: Container(
+                width: 2,
+                color: Colors.redAccent,
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 4,
+                vertical: 2,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.redAccent,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                '${guideSeconds.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
   //Waves
-  Widget _TwoSidedWaveformPainter(int index){
+Widget BarWaves(int index){
     final waveform = waveforms[index];
     if(waveform==null){
       return const SizedBox(
@@ -710,11 +871,15 @@ Widget _buildTrackTimeline(int index, {required bool isTablet}) {
       width: waveformWidth,
       height: 80,
       child: CustomPaint(
-          painter: TwoSidedWaveformPainter(samples:waveform.data,color:trackColors[index]),
-          ),
+        painter: BarWaveformPainter(
+          waveform: waveform,
+          peak: wavePeaks[index],
+          color: trackColors[index % trackColors.length],
+          pixelsPerSecond: pixelsPerSecond,
+        ),
+      ),
     );
   }
-
 }
 
 class RulerPainter extends CustomPainter {
@@ -753,74 +918,136 @@ canvas.drawLine(
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant RulerPainter old) =>
+      old.pixelsPerSecond != pixelsPerSecond ||
+      old.timelineScroll != timelineScroll;
 }
 
-class TwoSidedWaveformPainter extends CustomPainter {
-  final List<int> samples;
+class BarWaveformPainter extends CustomPainter {
+  final Waveform waveform;
+  final int peak;
   final Color color;
+  final double barWidth;
+  final double pixelsPerSecond;
+  final double barsPerSecond;
 
-  TwoSidedWaveformPainter({
-    required this.samples,
+  BarWaveformPainter({
+    required this.waveform,
+    required this.peak,
     required this.color,
+    required this.pixelsPerSecond,
+    this.barWidth = 3,
+    this.barsPerSecond = 25,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (samples.isEmpty) return;
-
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
+    final paint = Paint()..color = color;
     final centerY = size.height / 2;
 
-    // Find the largest amplitude.
-    final maxAmplitude = samples
-        .map((sample) => sample.abs())
-        .reduce((a, b) => a > b ? a : b);
+    final barSpacing = pixelsPerSecond / barsPerSecond;       
+    final wavePxPerSecond = waveform.sampleRate / waveform.samplesPerPixel;
+    final wavePxPerBar = wavePxPerSecond / barsPerSecond;
+    final barCount = (size.width / barSpacing).ceil();
 
-    if (maxAmplitude == 0) return;
+    for (int b = 0; b < barCount; b++) {
+      final start = (b * wavePxPerBar).floor();
+      if (start >= waveform.length) break;
+      var end = ((b + 1) * wavePxPerBar).floor();
+      if (end <= start) end = start + 1;
 
-    final path = Path();
+      // loudest value inside this bar's slice of audio
+      int amp = 0;
+      for (int p = start; p < end && p < waveform.length; p++) {
+        amp = math.max(
+          amp,
+          math.max(waveform.getPixelMax(p).abs(), waveform.getPixelMin(p).abs()),
+        );
+      }
 
-    // Top half
-    path.moveTo(0, centerY);
-
-    for (int i = 0; i < samples.length; i++) {
-      final normalized =
-          samples[i].abs() / maxAmplitude;
-
-      final amplitude = normalized * (size.height / 2);
-
-      path.lineTo(
-        i / (samples.length - 1) * size.width,
-        centerY - amplitude,
+      final h = math.max(2.0, amp / peak * size.height);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(b * barSpacing, centerY - h / 2, barWidth, h),
+          const Radius.circular(2),
+        ),
+        paint,
       );
     }
-
-    // Bottom half
-    for (int i = samples.length - 1; i >= 0; i--) {
-      final normalized =
-          samples[i].abs() / maxAmplitude;
-
-      final amplitude = normalized * (size.height / 2);
-
-      path.lineTo(
-        i / (samples.length - 1) * size.width,
-        centerY + amplitude,
-      );
-    }
-
-    path.close();
-
-    canvas.drawPath(path, paint);
   }
 
   @override
-  bool shouldRepaint(covariant TwoSidedWaveformPainter oldDelegate) {
-    return oldDelegate.samples != samples ||
-        oldDelegate.color != color;
-  }
+  bool shouldRepaint(covariant BarWaveformPainter old) =>
+      old.waveform != waveform ||
+      old.peak != peak ||
+      old.color != color ||
+      old.pixelsPerSecond != pixelsPerSecond;
 }
 
+class TimelineScrollbar extends StatelessWidget {
+  final double contentWidth;
+  final double viewportWidth;
+  final double offset;
+  final ValueChanged<double> onChanged;
+
+  const TimelineScrollbar({
+    super.key,
+    required this.contentWidth,
+    required this.viewportWidth,
+    required this.offset,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, c) {
+      final trackW = c.maxWidth;
+      final maxOffset = (contentWidth - viewportWidth).clamp(0.0, double.infinity);
+      final ratio = contentWidth <= 0
+          ? 1.0
+          : (viewportWidth / contentWidth).clamp(0.08, 1.0);
+      final thumbW = trackW * ratio;
+      final travel = trackW - thumbW;
+      final thumbLeft =
+          maxOffset > 0 ? (offset / maxOffset).clamp(0.0, 1.0) * travel : 0.0;
+
+      void jumpTo(double dx) {
+        if (maxOffset <= 0 || travel <= 0) return;
+        onChanged(((dx - thumbW / 2) / travel * maxOffset).clamp(0.0, maxOffset));
+      }
+
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (d) => jumpTo(d.localPosition.dx),
+        onHorizontalDragUpdate: (d) {
+          if (maxOffset <= 0 || travel <= 0) return;
+          onChanged((offset + d.delta.dx / travel * maxOffset)
+              .clamp(0.0, maxOffset));
+        },
+        child: SizedBox(
+          height: 24,
+          child: Stack(alignment: Alignment.centerLeft, children: [
+            Container(
+              height: 10,
+              decoration: BoxDecoration(
+                color: Colors.yellowAccent.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(5),
+              ),
+            ),
+            Positioned(
+              left: thumbLeft,
+              child: Container(
+                width: thumbW,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: maxOffset > 0 ? Colors.yellow.withValues(alpha: 0.5) : Colors.white24,
+                  borderRadius: BorderRadius.circular(5),
+                ),
+              ),
+            ),
+          ]),
+        ),
+      );
+    });
+  }
+}
