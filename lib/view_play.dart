@@ -9,8 +9,8 @@ import 'package:share_plus/share_plus.dart';
 class ViewPlayScreen extends StatefulWidget {
   final String title;
   final String artist;
-  final String views;
-  final String url;
+  final String videoId;
+  final String youtubeUrl;
   final String profileUrl;
   final String description;
   final String musicianEmail;
@@ -19,8 +19,8 @@ class ViewPlayScreen extends StatefulWidget {
     super.key,
     required this.title,
     required this.artist,
-    required this.views,
-    required this.url,
+    required this.videoId,
+    required this.youtubeUrl,
     required this.profileUrl,
     required this.description,
     required this.musicianEmail,
@@ -55,7 +55,7 @@ class _ViewPlayScreenState extends State<ViewPlayScreen> {
 
     final uri = Uri.parse(
     '$baseUrl/get_like'
-    '?play2_url=${Uri.encodeComponent(widget.url)}'
+    '?play2_url=${Uri.encodeComponent(widget.videoId)}'
     '&user_email=${Uri.encodeComponent(userEmail)}',
     );
 
@@ -90,7 +90,7 @@ class _ViewPlayScreenState extends State<ViewPlayScreen> {
 
     final uri = Uri.parse(
     '$baseUrl/add_like'
-    '?play2_url=${Uri.encodeComponent(widget.url)}'
+    '?play2_url=${Uri.encodeComponent(widget.videoId)}'
     '&user_email=${Uri.encodeComponent(userEmail)}'
     '&like=$newLikeStatus',
     );
@@ -185,14 +185,14 @@ class _ViewPlayScreenState extends State<ViewPlayScreen> {
 
   Future<void> _addPlay2Count() async {
 
-    if (widget.url.isEmpty) return;
+    if (widget.videoId.isEmpty) return;
 
     final email =
         Supabase.instance.client.auth.currentUser?.email ?? '';
 
     final uri = Uri.parse(
       '$baseUrl/add_play2_count'
-          '?p=${Uri.encodeComponent(widget.url)}'
+          '?p=${Uri.encodeComponent(widget.videoId)}'
           '&email=${Uri.encodeComponent(email)}',
     );
 
@@ -212,11 +212,11 @@ class _ViewPlayScreenState extends State<ViewPlayScreen> {
   }
 
   Future<void> _getPlay2Count() async {
-    if (widget.url.isEmpty) return;
+    if (widget.videoId.isEmpty) return;
 
     final uri = Uri.parse(
       '$baseUrl/get_play2_count'
-          '?p=${Uri.encodeComponent(widget.url)}',
+          '?p=${Uri.encodeComponent(widget.videoId)}',
     );
 
     try {
@@ -265,7 +265,7 @@ class _ViewPlayScreenState extends State<ViewPlayScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-           YouTubeScreen(videourl: widget.url),
+           YouTubeScreen(videourl: widget.youtubeUrl),
 
             const SizedBox(height: 20),
 
@@ -286,7 +286,7 @@ class _ViewPlayScreenState extends State<ViewPlayScreen> {
               children: [
                 widget.profileUrl.isNotEmpty
                 ? CachedNetworkImage(
-                    imageUrl: 'https://media05.fuzikapp.com/$widget.profileUrl',
+                  imageUrl: 'https://media05.fuzikapp.com/${widget.profileUrl}',
                     httpHeaders: {
                       'Referer': 'https://fuzikapp.com',
                     },
@@ -330,7 +330,7 @@ class _ViewPlayScreenState extends State<ViewPlayScreen> {
               ],
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
 
             // Divider
             Container(
@@ -338,29 +338,7 @@ class _ViewPlayScreenState extends State<ViewPlayScreen> {
               color: Colors.white12,
             ),
 
-            const SizedBox(height: 20),
-
-            const Text(
-              'Description',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 10),
-
-            Text(
-              widget.description,
-              style: TextStyle(
-                color: Colors.white60,
-                fontSize: 14,
-                height: 1.5,
-              ),
-            ),
-
-            const SizedBox(height: 30),
+            const SizedBox(height: 15),
 
             // action buttons
             Row(
@@ -369,12 +347,12 @@ class _ViewPlayScreenState extends State<ViewPlayScreen> {
                   child: OutlinedButton.icon(
                     onPressed: isLoadingLike ? null : _toggleLike,
                     icon: Icon(
-                    isLiked ? Icons.favorite : Icons.favorite_border,
-                    color: isLiked ? Colors.red : Colors.white,
+                      isLiked ? Icons.favorite : Icons.favorite_border,
+                      color: isLiked ? Colors.red : Colors.white,
                     ),
                     label: Text(
-                    isLiked ? 'Liked' : 'Like',
-                    style: const TextStyle(color: Colors.white),
+                      isLiked ? 'Liked' : 'Like',
+                      style: const TextStyle(color: Colors.white),
                     ),
 
                     style: OutlinedButton.styleFrom(
@@ -417,7 +395,7 @@ class _ViewPlayScreenState extends State<ViewPlayScreen> {
                     onPressed: () {
                       SharePlus.instance.share(
                         ShareParams(
-                          text: '${widget.title}\nby ${widget.artist}\n${widget.url}',
+                          text: '${widget.title}\nby ${widget.artist}\n${widget.youtubeUrl}',
                         ),
                       );
                     },
@@ -442,6 +420,28 @@ class _ViewPlayScreenState extends State<ViewPlayScreen> {
                   ),
                 ),
               ],
+            ),
+
+            const SizedBox(height: 24),
+
+            const Text(
+              'Description',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+            Text(
+              widget.description,
+              style: TextStyle(
+                color: Colors.white60,
+                fontSize: 14,
+                height: 1.5,
+              ),
             ),
           ],
         ),

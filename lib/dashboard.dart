@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'view_play.dart';
 import 'jam_watch.dart'; 
 import 'package:http/http.dart' as http;
-import 'package:cached_network_image/cached_network_image.dart'; //This is a package to cache the images, t
+import 'package:cached_network_image/cached_network_image.dart';
 
 class DashboardContent extends StatefulWidget {
   const DashboardContent({super.key});
@@ -17,6 +17,38 @@ class DashboardContentState extends State<DashboardContent> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   MemoryImage? image;
+
+  static const String mediaBaseUrl =
+      'https://media05.fuzikapp.com';
+
+  static const Map<String, String> _mediaHeaders = {
+    'Referer': 'https://fuzikapp.com',
+  };
+
+  String? _getMediaUrl(String? path) {
+    if (path == null || path.trim().isEmpty) {
+      return null;
+    }
+
+    final cleanPath = path.trim();
+
+    if (cleanPath == 'None' ||
+        cleanPath.toLowerCase() == 'null' ||
+        cleanPath.toLowerCase() == 'false') {
+      return null;
+    }
+
+    if (cleanPath.startsWith('http://') ||
+        cleanPath.startsWith('https://')) {
+      return cleanPath;
+    }
+
+    final normalizedPath = cleanPath.startsWith('/')
+        ? cleanPath.substring(1)
+        : cleanPath;
+
+    return '$mediaBaseUrl/$normalizedPath';
+  }
 
   Future<int> _getViewCount(String videoUrl) async {
     try {
@@ -41,6 +73,31 @@ class DashboardContentState extends State<DashboardContent> {
     return 0;
   }
 
+  Future<int> _getJamViewCount(String jamUrl) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          'https://engine01.fuzikapp.com/get_jam2_count'
+              '?j=${Uri.encodeComponent(jamUrl)}',
+        ),
+        headers: {
+          'Referer': 'https://fuzikapp.com',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data is List && data.isNotEmpty) {
+          return data[0]['view_count'] ?? 0;
+        }
+      }
+    } catch (e) {
+      debugPrint('GET DASHBOARD JAM VIEW ERROR: $e');
+    }
+
+    return 0;
+  }
 
 
   Future<Map<String, List<Map<String, dynamic>>>> _fetchVideos({
@@ -108,6 +165,49 @@ class DashboardContentState extends State<DashboardContent> {
     }
   }
 
+  Future<List<Map<String, dynamic>>> _fetchCollaborations({
+    String query = '',
+  }) async {
+    try {
+      final encodedQuery = Uri.encodeComponent(query);
+
+      final response = await http.get(
+        Uri.parse(
+          'https://engine01.fuzikapp.com/jam2s/?q=$encodedQuery',
+        ),
+        headers: {
+          'Referer': 'https://fuzikapp.com',
+        },
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to load collaborations');
+      }
+
+      final data = jsonDecode(response.body);
+
+      final collaborations =
+      List<Map<String, dynamic>>.from(data);
+
+      await Future.wait(
+        collaborations.map((jam) async {
+          final jamUrl = jam['url']?.toString() ?? '';
+
+          if (jamUrl.isNotEmpty) {
+            jam['view_count'] =
+            await _getJamViewCount(jamUrl);
+          }
+        }),
+      );
+
+      return collaborations;
+    } catch (e) {
+      debugPrint('Error fetching collaborations: $e');
+      return [];
+    }
+  }
+
+
 
   @override
   void dispose() {
@@ -117,8 +217,13 @@ class DashboardContentState extends State<DashboardContent> {
 
   @override
   Widget build(BuildContext context) {
-    final videosFuture = _fetchVideos(query: _searchQuery);
+    final videosFuture = isSoloSelected
+        ? _fetchVideos(query: _searchQuery)
+        : null;
 
+    final collaborationsFuture = !isSoloSelected
+        ? _fetchCollaborations(query: _searchQuery)
+        : null;
     double screenWidth = MediaQuery.of(context).size.shortestSide;
     double paddingHorizontal = screenWidth < 600 ? 16.0 : 40.0;
     bool isTablet = screenWidth >= 600;
@@ -223,7 +328,7 @@ class DashboardContentState extends State<DashboardContent> {
 
           //Portrait Videos
           isSoloSelected?FutureBuilder<Map<String, List<Map<String, dynamic>>>>(
-          future: videosFuture,
+          future: videosFuture!,
           builder: (context,snapshot){
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Color(0xFFFFD600))));
@@ -253,6 +358,7 @@ class DashboardContentState extends State<DashboardContent> {
                   final preview = video['preview']?.toString()??'';
                   final profileUrl = video['musician_profile_pic']?.toString() ?? '';
                   final sampleurl = video['youtube_url']?.toString() ?? '';
+                  final videoId = video['url']?.toString() ?? '';
                   final description=video['description']?.toString() ??'';
                   return _buildVideoCard(
                     title,
@@ -262,29 +368,27 @@ class DashboardContentState extends State<DashboardContent> {
                     profileUrl,
                     isSolo: isSoloSelected,
                     isPortrait: true,
-                    onTap: () {
+                    onTap: () async {
                       if (isSoloSelected) {
-                        Navigator.push(
+                        await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => ViewPlayScreen(
                               title: title,
                               artist: artist,
-                              views: views,
-                              url: sampleurl,
+                              videoId: videoId,
+                              youtubeUrl: sampleurl,
                               profileUrl: profileUrl,
-                              description:description,
-                              musicianEmail: video['musician_email']?.toString() ?? '',
+                              description: description,
+                              musicianEmail:
+                              video['musician_email']?.toString() ?? '',
                             ),
                           ),
                         );
-                      } else {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const JamWatchScreen(),
-                          ),
-                        );
+
+                        if (!mounted) return;
+
+                        setState(() {});
                       }
                     },
                   );
@@ -293,8 +397,10 @@ class DashboardContentState extends State<DashboardContent> {
             );
           }
           ):Container(),
-          Text(isSoloSelected ? 'Landscape' : 'Group', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+
+          Text(isSoloSelected ? 'Landscape' : 'Jam Videos', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
+          /*
           // ตารางวิดีโอ (GridView)
           FutureBuilder<Map<String, List<Map<String, dynamic>>>>(
             future: videosFuture,
@@ -366,6 +472,184 @@ class DashboardContentState extends State<DashboardContent> {
               );
             },
           ),
+    */
+
+          FutureBuilder<dynamic>(
+            future: isSoloSelected ? videosFuture! : collaborationsFuture!,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(40.0),
+                    child: CircularProgressIndicator(
+                      color: Color(0xFFFFD600),
+                    ),
+                  ),
+                );
+              }
+
+              if (!snapshot.hasData) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(40.0),
+                    child: Text(
+                      'Sorry, we could not find any videos with $_searchQuery.',
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+
+              // SOLO
+
+              if (isSoloSelected) {
+                final data = snapshot.data as Map<String, List<Map<String, dynamic>>>;
+                final videos = data['landscape'] ?? [];
+
+                if (videos.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(40.0),
+                      child: Text(
+                        'Sorry, we could not find any landscape videos with $_searchQuery.',
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: columns == 1 ? 1.5 : 1.0,
+                  ),
+                  itemCount: videos.length,
+                  itemBuilder: (context, index) {
+                    final video = videos[index];
+
+                    final title = video['video_title']?.toString() ?? '';
+                    final artist = video['musician_name']?.toString() ?? '';
+                    final views = '${video['view_count'] ?? 0} views';
+                    final preview = video['preview']?.toString() ?? '';
+                    final profileUrl =
+                        video['musician_profile_pic']?.toString() ?? '';
+                    final sampleurl = video['youtube_url']?.toString() ?? '';
+                    final videoId = video['url']?.toString() ?? '';
+                    final description = video['description']?.toString() ?? '';
+
+                    return _buildVideoCard(
+                      title,
+                      artist,
+                      views,
+                      preview,
+                      profileUrl,
+                      isPortrait: false,
+                      isSolo: true,
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ViewPlayScreen(
+                              title: title,
+                              artist: artist,
+                              videoId: videoId,
+                              youtubeUrl: sampleurl,
+                              profileUrl: profileUrl,
+                              description: description,
+                              musicianEmail:
+                              video['musician_email']?.toString() ?? '',
+                            ),
+                          ),
+                        );
+
+                        if (!mounted) return;
+
+                        setState(() {});
+                      },
+                    );
+                  },
+                );
+              }
+
+
+              // COLLABORATION
+
+              final collaborations =
+              snapshot.data as List<Map<String, dynamic>>;
+
+              if (collaborations.isEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(40.0),
+                    child: Text(
+                      'Sorry, we could not find any collaborations with $_searchQuery.',
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 10,
+                  childAspectRatio: columns == 1 ? 1.5 : 1.0,
+                ),
+                itemCount: collaborations.length,
+                itemBuilder: (context, index) {
+                  final jam = collaborations[index];
+
+                  final title = jam['description']?.toString() ?? 'Collaboration';
+                  final artist = jam['owner_name']?.toString() ?? '';
+                  final preview = jam['preview']?.toString() ?? '';
+                  final profileUrl = jam['profile_pic']?.toString() ?? '';
+                  final jamUrl = jam['url']?.toString() ?? '';
+                  final views = '${jam['view_count'] ?? 0} views';
+
+                  return _buildVideoCard(
+                    title,
+                    artist,
+                    views,
+                    preview,
+                    profileUrl,
+                    isPortrait: false,
+                    isSolo: false,
+                    onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => JamWatchScreen(
+                            jamUrl: jamUrl,
+                          ),
+                        ),
+                      );
+
+                      if (!mounted) return;
+
+                      setState(() {});
+                    },
+                  );
+                },
+              );
+            },
+          ),
          
         ],
       ),
@@ -388,6 +672,8 @@ class DashboardContentState extends State<DashboardContent> {
         required bool isSolo,
         VoidCallback? onTap,
       }) {
+    final previewUrl = _getMediaUrl(preview);
+    final profileImageUrl = _getMediaUrl(profileUrl);
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -407,17 +693,41 @@ class DashboardContentState extends State<DashboardContent> {
               ),
               child: Stack(
                 children: [
-                   ClipRRect(
+                  ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                     child: CachedNetworkImage(
-                        imageUrl: preview,
-                        fit:BoxFit.cover,
-                        width: double.infinity,
-                        height: double.infinity,
-                        placeholder: (context, url) => Center(child: CircularProgressIndicator(color:Colors.yellow)),
-                        errorWidget: (context, url, error) => Icon(Icons.error),
-                                       ),
-                   ),
+                    child: previewUrl != null
+                        ? CachedNetworkImage(
+                      imageUrl: previewUrl,
+                      httpHeaders: _mediaHeaders,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
+                      placeholder: (context, url) =>
+                      const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFFFFD600),
+                        ),
+                      ),
+                      errorWidget: (
+                          context,
+                          url,
+                          error,
+                          ) =>
+                      const Center(
+                        child: Icon(
+                          Icons.broken_image,
+                          color: Colors.white54,
+                        ),
+                      ),
+                    )
+                        : const Center(
+                      child: Icon(
+                        Icons.music_video,
+                        color: Colors.white30,
+                        size: 48,
+                      ),
+                    ),
+                  ),
 
                   Positioned(
                     bottom: 8,
@@ -445,20 +755,39 @@ class DashboardContentState extends State<DashboardContent> {
           const SizedBox(height: 8),
           Row(
             children: [
-              profileUrl.isNotEmpty
-    ? CachedNetworkImage(
-        imageUrl: 'https://media05.fuzikapp.com/$profileUrl',
-        httpHeaders: {
-          'Referer': 'https://fuzikapp.com',
-        },
-        width: 30,
-        height: 30,
-        fit: BoxFit.cover,
-        errorWidget: (context, url, error) {
-          return const Icon(Icons.person);
-        },
-      )
-    : const Icon(Icons.person),
+              Container(
+                width: 30,
+                height: 30,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey,
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: profileImageUrl != null
+                    ? CachedNetworkImage(
+                  imageUrl: profileImageUrl,
+                  httpHeaders: _mediaHeaders,
+                  width: 30,
+                  height: 30,
+                  fit: BoxFit.cover,
+                  errorWidget: (
+                      context,
+                      url,
+                      error,
+                      ) {
+                    return const Icon(
+                      Icons.person,
+                      color: Colors.white,
+                      size: 18,
+                    );
+                  },
+                )
+                    : const Icon(
+                  Icons.person,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(

@@ -8,6 +8,7 @@ class InventoryVideoScreen extends StatefulWidget {
   final String videoUrl;
   final bool autoEdit;
   final bool isPublished;
+  final bool isCollaboration;
   final Map<String, dynamic>? inventoryVideo;
 
   const InventoryVideoScreen({
@@ -15,6 +16,7 @@ class InventoryVideoScreen extends StatefulWidget {
     required this.videoUrl,
     required this.isPublished,
     this.autoEdit = false,
+    this.isCollaboration = false,
     this.inventoryVideo,
   });
 
@@ -89,123 +91,198 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
     return 'https://www.youtube.com/watch?v=$youtubeValue';
   }
 
+  String _buildJamTitle(
+      Map<String, dynamic> jam,
+      ) {
+    final instruments = [
+      jam['video01_instrument']?.toString() ?? '',
+      jam['video02_instrument']?.toString() ?? '',
+      jam['video03_instrument']?.toString() ?? '',
+      jam['video04_instrument']?.toString() ?? '',
+    ].where((instrument) {
+      final value = instrument.trim();
+
+      return value.isNotEmpty &&
+          value.toLowerCase() != 'undefined' &&
+          value.toLowerCase() != 'null' &&
+          value.toLowerCase() != 'none';
+    }).toList();
+
+    final landscapeCount =
+        int.tryParse(
+          jam['layout_l_num']?.toString() ?? '',
+        ) ??
+            0;
+
+    final portraitCount =
+        int.tryParse(
+          jam['layout_p_num']?.toString() ?? '',
+        ) ??
+            0;
+
+    final pieceCount =
+        landscapeCount + portraitCount;
+
+    if (pieceCount > 0) {
+      return '$pieceCount-piece collaboration - '
+          '${instruments.join(', ')}';
+    }
+
+    if (instruments.isNotEmpty) {
+      return '${instruments.length}-piece collaboration - '
+          '${instruments.join(', ')}';
+    }
+
+    return 'Collaboration';
+  }
+
   Future<void> _loadVideo() async {
     try {
+      final endpoint = widget.isCollaboration
+          ? '$baseUrl/jam2_watch'
+          : '$baseUrl/play2_watch';
+
+      final parameter = widget.isCollaboration
+          ? 'j'
+          : 'p';
+
       final response = await http.get(
         Uri.parse(
-          '$baseUrl/play2_watch'
-              '?p=${Uri.encodeComponent(widget.videoUrl)}',
+          '$endpoint'
+              '?$parameter=${Uri.encodeComponent(widget.videoUrl)}',
         ),
+        headers: _mediaHeaders,
       );
 
       debugPrint(
-        'INVENTORY VIDEO STATUS: ${response.statusCode}',
+        widget.isCollaboration
+            ? 'INVENTORY COLLAB STATUS: ${response.statusCode}'
+            : 'INVENTORY VIDEO STATUS: ${response.statusCode}',
       );
 
       debugPrint(
-        'INVENTORY VIDEO RESPONSE: ${response.body}',
+        widget.isCollaboration
+            ? 'INVENTORY COLLAB RESPONSE: ${response.body}'
+            : 'INVENTORY VIDEO RESPONSE: ${response.body}',
       );
 
       if (response.statusCode != 200) {
         throw Exception(
-          'Failed to load video',
+          widget.isCollaboration
+              ? 'Failed to load collaboration'
+              : 'Failed to load video',
         );
       }
 
       final data = jsonDecode(response.body);
 
       if (data is List && data.isNotEmpty) {
-        final loadedVideo =
+        final loadedData =
         Map<String, dynamic>.from(
           data[0],
         );
 
         if (!mounted) return;
 
-        setState(() {
-          video = loadedVideo;
-          isLoading = false;
-        });
+        if (widget.isCollaboration) {
+          final normalizedCollaboration =
+          <String, dynamic>{
+            ...loadedData,
 
-        final musicianEmail =
-            loadedVideo['musician_email']
+            'video_title': _buildJamTitle(
+              loadedData,
+            ),
+
+            'musician_name':
+            loadedData['owner_display_name']
                 ?.toString() ??
-                '';
+                '',
 
-        if (musicianEmail.isNotEmpty) {
-          await _loadMusicianProfile(
-            musicianEmail,
-          );
+            'description':
+            loadedData['description']
+                ?.toString() ??
+                '',
+
+            'created_time':
+            loadedData['created_time']
+                ?.toString() ??
+                '',
+
+            'youtube_url':
+            loadedData['youtube_url']
+                ?.toString() ??
+                '',
+          };
+
+          setState(() {
+            video = normalizedCollaboration;
+
+            _profilePicturePath =
+                loadedData['owner_display_pic']
+                    ?.toString();
+
+            isLoading = false;
+          });
+          await _getJamViewCount();
+
+        } else {
+          setState(() {
+            video = loadedData;
+            isLoading = false;
+          });
+
+          final musicianEmail =
+              loadedData['musician_email']
+                  ?.toString() ??
+                  '';
+
+          if (musicianEmail.isNotEmpty) {
+            await _loadMusicianProfile(
+              musicianEmail,
+            );
+          }
+
+          await _getViewCount();
+
+          if (widget.autoEdit && mounted) {
+            WidgetsBinding.instance
+                .addPostFrameCallback((_) {
+              if (mounted) {
+                _showEditDialog();
+              }
+            });
+          }
         }
+      } else if (widget.inventoryVideo != null) {
+        if (!mounted) return;
 
-        final youtubeValue =
-            loadedVideo['youtube_url']
-                ?.toString() ??
-                '';
-
-        debugPrint(
-          'YOUTUBE URL: $youtubeValue',
+        final fallback =
+        Map<String, dynamic>.from(
+          widget.inventoryVideo!,
         );
 
-        await _addViewCount();
-        await _getViewCount();
+        if (widget.isCollaboration) {
+          fallback['video_title'] =
+              _buildJamTitle(fallback);
 
-        if (widget.autoEdit && mounted) {
-          WidgetsBinding.instance
-              .addPostFrameCallback((_) {
-            if (mounted) {
-              _showEditDialog();
-            }
-          });
+          fallback['musician_name'] =
+              fallback['owner_name']
+                  ?.toString() ??
+                  '';
+
+          _profilePicturePath =
+              fallback['profile_pic']
+                  ?.toString();
         }
-      } else if (widget.inventoryVideo != null) {
-        if (!mounted) return;
 
         setState(() {
-          video = Map<String, dynamic>.from(
-            widget.inventoryVideo!,
-          );
+          video = fallback;
           isLoading = false;
         });
 
-        if (widget.autoEdit && mounted) {
-          WidgetsBinding.instance
-              .addPostFrameCallback((_) {
-            if (mounted) {
-              _showEditDialog();
-            }
-          });
-        }
-      } else if (widget.inventoryVideo != null) {
-        if (!mounted) return;
-
-        setState(() {
-          video = Map<String, dynamic>.from(
-            widget.inventoryVideo!,
-          );
-          isLoading = false;
-        });
-
-        if (widget.autoEdit && mounted) {
-          WidgetsBinding.instance
-              .addPostFrameCallback((_) {
-            if (mounted) {
-              _showEditDialog();
-            }
-          });
-        }
-
-      } else if (widget.inventoryVideo != null) {
-        if (!mounted) return;
-
-        setState(() {
-          video = Map<String, dynamic>.from(
-            widget.inventoryVideo!,
-          );
-          isLoading = false;
-        });
-
-        if (widget.autoEdit && mounted) {
+        if (!widget.isCollaboration &&
+            widget.autoEdit &&
+            mounted) {
           WidgetsBinding.instance
               .addPostFrameCallback((_) {
             if (mounted) {
@@ -215,12 +292,16 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
         }
       } else {
         throw Exception(
-          'Video not found',
+          widget.isCollaboration
+              ? 'Collaboration not found'
+              : 'Video not found',
         );
       }
     } catch (e) {
       debugPrint(
-        'INVENTORY VIDEO ERROR: $e',
+        widget.isCollaboration
+            ? 'INVENTORY COLLAB ERROR: $e'
+            : 'INVENTORY VIDEO ERROR: $e',
       );
 
       if (!mounted) return;
@@ -229,10 +310,13 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
         isLoading = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         SnackBar(
           content: Text(
-            'Failed to load video: $e',
+            widget.isCollaboration
+                ? 'Failed to load collaboration: $e'
+                : 'Failed to load video: $e',
           ),
         ),
       );
@@ -275,32 +359,6 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
     }
   }
 
-  Future<void> _addViewCount() async {
-    try {
-      final email =
-          Supabase.instance.client.auth.currentUser?.email ?? '';
-
-      if (email.isEmpty) {
-        return;
-      }
-
-      final response = await http.get(
-        Uri.parse(
-          '$baseUrl/add_play2_count'
-              '?p=${Uri.encodeComponent(widget.videoUrl)}'
-              '&email=${Uri.encodeComponent(email)}',
-        ),
-      );
-
-      debugPrint(
-        'VIEW STATUS: ${response.statusCode}',
-      );
-    } catch (e) {
-      debugPrint(
-        'VIEW ERROR: $e',
-      );
-    }
-  }
 
   Future<void> _getViewCount() async {
     try {
@@ -335,6 +393,39 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
     }
   }
 
+  Future<void> _getJamViewCount() async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/get_jam2_count'
+              '?j=${Uri.encodeComponent(widget.videoUrl)}',
+        ),
+        headers: _mediaHeaders,
+      );
+
+      debugPrint(
+        'GET JAM VIEW STATUS: ${response.statusCode}',
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data is List && data.isNotEmpty) {
+          if (!mounted) return;
+
+          setState(() {
+            viewCount = data[0]['view_count'] ?? 0;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint(
+        'GET JAM VIEW ERROR: $e',
+      );
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -352,8 +443,10 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
             Navigator.pop(context, true);
           },
         ),
-        title: const Text(
-          'Video Details',
+        title: Text(
+          widget.isCollaboration
+              ? 'Collaboration Details'
+              : 'Video Details',
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
@@ -566,7 +659,7 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
           const SizedBox(height: 20),
 
           // EDIT, publish/unpublish
-
+        if (!widget.isCollaboration) ...[
           Row(
             children: [
               Expanded(
@@ -637,6 +730,7 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
             ],
           ),
           const SizedBox(height: 24),
+        ],
 
           const Divider(
             color: Colors.white24,
@@ -649,56 +743,74 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
             'Description',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 17,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
           ),
 
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
+
+          if (widget.isCollaboration) ...[
+            Text(
+              'This collaboration consists of:',
+              style: TextStyle(
+                color: Colors.grey[400],
+                fontSize: 13,
+                height: 1.6,
+              ),
+            ),
+
+            const SizedBox(height: 8),
+          ],
 
           Text(
             description.isEmpty
                 ? 'No description'
-                : description,
+                : description
+                .replaceAll(r'\n', '\n')
+                .trim(),
             style: TextStyle(
               color: Colors.grey[400],
-              fontSize: 14,
+              fontSize: 13,
               height: 1.6,
             ),
           ),
 
           const SizedBox(height: 24),
 
-          const Text(
-            'Music Information',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-
-          const SizedBox(height: 14),
-
-          if (musicTitle.isNotEmpty)
-            _buildInfoRow(
-              'Music',
-              musicTitle,
+          if (!widget.isCollaboration) ...[
+            const Text(
+              'Music Information',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+              ),
             ),
 
-          if (originalPerformer.isNotEmpty)
-            _buildInfoRow(
-              'Original Performer',
-              originalPerformer,
-            ),
+            const SizedBox(height: 14),
 
-          if (instrument.isNotEmpty)
-            _buildInfoRow(
-              'Instrument',
-              instrument,
-            ),
+            if (musicTitle.isNotEmpty)
+              _buildInfoRow(
+                'Music',
+                musicTitle,
+              ),
 
-          const SizedBox(height: 20),
+            if (originalPerformer.isNotEmpty)
+              _buildInfoRow(
+                'Original Performer',
+                originalPerformer,
+              ),
+
+            if (instrument.isNotEmpty)
+              _buildInfoRow(
+                'Instrument',
+                instrument,
+              ),
+
+            const SizedBox(height: 20),
+          ],
+
         ],
       ),
     );
