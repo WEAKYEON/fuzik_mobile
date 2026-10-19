@@ -21,7 +21,7 @@ class _YouTubeScreenState extends State<YouTubeScreen>{
       videoId:videoId!, 
       autoPlay: true, 
       params: const YoutubePlayerParams(
-        showControls:true,showFullscreenButton: false,playsInline: true,showVideoAnnotations: false,enableCaption: false
+        showControls:true,showFullscreenButton: true,playsInline: true,showVideoAnnotations: false,enableCaption: false
         )
         );  
   }
@@ -38,6 +38,7 @@ class _YouTubeScreenState extends State<YouTubeScreen>{
     _startvideo? YoutubePlayer(
       controller:controller,
       aspectRatio: 16/9,
+      autoFullScreen: false,
     ):
     YoutubePlayerThumbnail(
     controller: controller,

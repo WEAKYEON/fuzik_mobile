@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:fuzik_mobile/services/fetch_collaboration_videos.dart';
 import 'dart:async';
+import 'dart:convert';
 import 'view_play.dart';
 import 'jam_watch.dart'; 
 import 'package:cached_network_image/cached_network_image.dart'; 
 import 'package:fuzik_mobile/services/fetch_videos.dart';
+import 'package:http/http.dart' as http;
 
 class DashboardContent extends StatefulWidget {
   const DashboardContent({super.key});
@@ -27,6 +29,23 @@ class _DashboardContentState extends State<DashboardContent> {
   }) : setState(() {
     _collaborationVideosFuture= fetchCollaborationVideos(query:_searchQuery);
   });
+  }
+
+  Future<int> getJamViews({required String videoUrl}) async{
+    final url=Uri.parse('https://engine01.fuzikapp.com/get_jam2_count?j=$videoUrl');
+    try{
+      final response=await http.get(url);
+      if(response.statusCode!=200){
+        return 0;
+      }
+      final jsonString=response.body;
+      final data=jsonDecode(jsonString);
+      final viewCount=data[0]['view_count'];
+      return viewCount;
+    }
+    catch(e){
+      throw Exception(e);
+    }
   }
 
   Future<void> _refresh() async{
@@ -225,7 +244,7 @@ class _DashboardContentState extends State<DashboardContent> {
                       isSolo: isSoloSelected,
                       isPortrait: true,
                       onTap: () {
-                        if (isSoloSelected) {
+                        
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -240,14 +259,7 @@ class _DashboardContentState extends State<DashboardContent> {
                               ),
                             ),
                           );
-                        } else {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const JamWatchScreen(),
-                            ),
-                          );
-                        }
+                        
                       },
                     );
                   },
@@ -322,7 +334,7 @@ class _DashboardContentState extends State<DashboardContent> {
                       isPortrait: false,
                       isSolo: isSoloSelected,
                       onTap: () {
-                        if (isSoloSelected) {
+                        
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -337,14 +349,7 @@ class _DashboardContentState extends State<DashboardContent> {
                               ),
                             ),
                           );
-                        } else {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const JamWatchScreen(),
-                            ),
-                          );
-                        }
+                        
                       },
                     );
                   },
@@ -399,16 +404,14 @@ class _DashboardContentState extends State<DashboardContent> {
                   itemCount: videos.length,
                   itemBuilder: (context, index) {
                     final video = videos[index];
-      
                     final title = video['description']?.toString() ?? '';
                     final artist = video['owner_name']?.toString() ?? '';
-                    final views = '${video['view_count'] ?? 0} views';
+                    final videoUrl=video['url']?.toString()??'';
                     final previewUrl = video['preview']?.toString()??'';
                     final profileUrl = video['profile_pic']?.toString() ?? '';
                     final youtubeCode=video['youtube_url']??'';
                     final description = video['description']?.toString()??'';
-                    final videoUrl=video['url']?.toString()??'';
-
+                    final views='';
                     final preview='https://media05.fuzikapp.com/$previewUrl';
                     return _buildVideoCard(
                       title,
@@ -418,30 +421,23 @@ class _DashboardContentState extends State<DashboardContent> {
                       profileUrl,
                       isPortrait: false,
                       isSolo: isSoloSelected,
+                      videoUrl: videoUrl,
                       onTap: () {
-                        if (isSoloSelected) {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => ViewPlayScreen(
+                              builder: (context) => JamWatchScreen(
                                 title: title,
-                                artist: artist,
-                                views: views,
                                 youTubeCode:youtubeCode,
                                 profileUrl: profileUrl,
                                 description: description,
                                 videoUrl: videoUrl,
+                                isSolo:isSoloSelected,
+                                previewUrl:preview
                               ),
                             ),
                           );
-                        } else {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const JamWatchScreen(),
-                            ),
-                          );
-                        }
+                        
                       },
                     );
                   },
@@ -464,6 +460,7 @@ class _DashboardContentState extends State<DashboardContent> {
         required bool isSolo,
         VoidCallback? onTap,
         int retry = 0,
+        String videoUrl=''
       }) {
     
     return GestureDetector(
@@ -574,13 +571,31 @@ class _DashboardContentState extends State<DashboardContent> {
           ),
           Padding(
             padding: const EdgeInsets.only(left: 20),
-            child: Text(
+            child: isSolo? Text(
               views,
               style: const TextStyle(
-                color: Colors.white38,
+                color: Colors.grey,
                 fontSize: 11,
               ),
-            ),
+            )
+            : FutureBuilder(future: getJamViews(videoUrl: videoUrl), 
+                            builder: (context,snapeshot){
+                               if(snapeshot.connectionState==ConnectionState.waiting){
+                                return CircularProgressIndicator(color:Colors.yellow);
+                               }
+                               if(!snapeshot.hasData){
+                                return Text('0');
+                               }
+                               final result=snapeshot.data!.toString();
+                               return Text(
+                                '$result views',
+                                style: const TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 11,
+                                ),
+                              );
+                            }
+                            )
           ),
         ],
       ),

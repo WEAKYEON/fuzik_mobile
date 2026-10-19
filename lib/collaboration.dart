@@ -61,128 +61,153 @@ class _CollaborationContentState extends State<CollaborationContent> {
           const SizedBox(height: 32),
           
           FutureBuilder<VideoLayouts>(
-  future: _layoutsFuture,
-  builder: (context, snapshot) {
-    if (snapshot.connectionState == ConnectionState.waiting) {
-      return const SizedBox(
-        height: 200,
-        child: Center(
-          child: CircularProgressIndicator(
-            color: Color(0xFFFFD600),
-          ),
-        ),
-      );
-    }
-
-    if (snapshot.hasError) {
-      return SizedBox(
-        height: 200,
-        child: Center(
-          child: Text(
-            'Error: ${snapshot.error}',
-            style: const TextStyle(color: Colors.red),
-          ),
-        ),
-      );
-    }
-
-    if (!snapshot.hasData) {
-      return const SizedBox(
-        height: 200,
-        child: Center(
-          child: Text(
-            'No layouts found',
-            style: TextStyle(color: Colors.white),
-          ),
-        ),
-      );
-    }
-
-    final layoutsList = snapshot.data!;
-
-    if (layoutsList.hasError) {
-      return SizedBox(
-        height: 200,
-        child: Center(
-          child: Text(
-            'Error: ${layoutsList.error}. Swipe down to refresh.',
-            style: const TextStyle(color: Colors.red),
-          ),
-        ),
-      );
-    }
-
-    if (layoutsList.layouts.isEmpty) {
-      return const SizedBox(
-        height: 200,
-        child: Center(
-          child: Text(
-            'No layouts found',
-            style: TextStyle(color: Colors.white),
-          ),
-        ),
-      );
-    }
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: columns,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 1.5,
-      ),
-      itemCount: layoutsList.layouts.length,
-      itemBuilder: (context, index) {
-        final layoutData = layoutsList.layouts[index];
-
-        final String imagePath = layoutData['layout_file_location'];
-        final String imageUrl =
-            'https://media05.fuzikapp.com/$imagePath';
-
-        return InkWell(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) =>
-                    ChooseVideo2(layoutData: layoutData),
-              ),
-            );
-          },
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: CachedNetworkImage(
-                imageUrl: imageUrl,
-                fit: BoxFit.contain,
-                placeholder: (context, url) => const Center(
-                  child: CircularProgressIndicator(
-                    color: Color(0xFFFFD600),
+            future: _layoutsFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SizedBox(
+                  height: 200,
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: Color(0xFFFFD600),
+                    ),
                   ),
-                ),
-                errorWidget: (context, url, error) =>
-                    const Center(
-                  child: Icon(
-                    Icons.broken_image,
-                    color: Colors.grey,
-                    size: 40,
+                );
+              }
+
+              if (snapshot.hasError) {
+                return SizedBox(
+                  height: 200,
+                  child: Center(
+                    child: Text(
+                      'Error: ${snapshot.error}',
+                      style: const TextStyle(color: Colors.red),
+                    ),
                   ),
+                );
+              }
+
+              if (!snapshot.hasData) {
+                return const SizedBox(
+                  height: 200,
+                  child: Center(
+                    child: Text(
+                      'No layouts found',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                );
+              }
+
+              final layoutsList = snapshot.data!;
+
+              if (layoutsList.hasError) {
+                return SizedBox(
+                  height: 200,
+                  child: Center(
+                    child: Text(
+                      'Error: ${layoutsList.error}. Swipe down to refresh.',
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  ),
+                );
+              }
+
+              if (layoutsList.layouts.isEmpty) {
+                return const SizedBox(
+                  height: 200,
+                  child: Center(
+                    child: Text(
+                      'No layouts found',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                );
+              }
+
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  childAspectRatio: 1.5,
                 ),
+                itemCount: layoutsList.layouts.length,
+                itemBuilder: (context, index) {
+                  final layoutData = layoutsList.layouts[index];
+
+                  final String imagePath = layoutData['layout_file_location'];
+                  final String imageUrl =
+                      'https://media05.fuzikapp.com/$imagePath';
+
+                  return InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              ChooseVideo2(layoutData: layoutData),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: CachedNetworkImage(
+                          imageUrl: imageUrl,
+                          fit: BoxFit.contain,
+                          placeholder: (context, url) => const Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFFFFD600),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) =>
+                              const Center(
+                            child: Icon(
+                              Icons.broken_image,
+                              color: Colors.grey,
+                              size: 40,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+          widget.showBackButton? 
+          Center(
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(25),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.yellow.withValues(alpha: 0.5),
+                    blurRadius: 20,
+                    spreadRadius: 5
+                  )
+                  ],
+              ),
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.yellow,
+                  foregroundColor: Colors.black
+                ),
+                onPressed: (){
+                Navigator.pop(context);
+              }, child: Text('Back')
               ),
             ),
-          ),
-        );
-      },
-    );
-  },
-)
+          ) 
+          :Container()
         ],
       ),
     )

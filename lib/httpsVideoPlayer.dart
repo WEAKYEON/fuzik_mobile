@@ -1,15 +1,17 @@
 import 'dart:async';
-import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:fuzik_mobile/services/fetch_videos.dart'; 
+import 'jam_watch.dart';
+
+import 'package:cached_network_image/cached_network_image.dart';
 
 class HttpsVideoPlayer extends StatefulWidget {
   final String videoUrl;
-
-  const HttpsVideoPlayer({super.key,required this.videoUrl});
+  final bool isSolo;
+  final String previewUrl;
+  final Video videoDetail;
+  const HttpsVideoPlayer({super.key,required this.videoUrl, this.isSolo=true, this.previewUrl='',  this.videoDetail=const Video()});
 
   @override
   State<HttpsVideoPlayer> createState()=>_HttpsVideoPlayer();
@@ -17,38 +19,12 @@ class HttpsVideoPlayer extends StatefulWidget {
 
 class _HttpsVideoPlayer extends State<HttpsVideoPlayer>{
   late VideoPlayerController _controller;
-  late Future<Video> videoDetail;
+  bool hasController=false;
   String videoError = '';
   bool isLoading = true;
-  Future<Video> getVideoDetail() async{
-    if(!await hasNetwork()){
-      return Video(error: 'No connection. Please connect to network');
-    }
-    try{
-      final url=Uri.parse('https://engine01.fuzikapp.com/play2_watch?p=${widget.videoUrl}');
-      final response = await http.get(url).timeout(Duration(seconds: 30));
-      if(response.statusCode==500){
-        return Video(error:'Sorry. Internal Server error. Please try again later.');
-      }
-      if(response.statusCode==200){
-        final videoDetail=List<dynamic>.from(jsonDecode(response.body));
-        return Video(videoDetail: videoDetail);
-      }
-      return Video(error: 'Sorry. Cannot get the video. Please try again.');
-    }on TimeoutException{
-      return Video(error: 'Sorry. Your connection is too slow.');
-    }on SocketException {
-    return const Video(error: 'Could not reach the server. Check your connection.');
-    } on FormatException {
-    return const Video(error: 'Received an unexpected response from the server.');
-    } 
-    catch(e){
-      return Video(error: 'Cannot get the video. Error: $e');
-    }
-  }
   
   Future<void> initializeVideo() async {
-  final result = await getVideoDetail();
+  final result = widget.isSolo? await getVideoDetail(isSolo: widget.isSolo,videoUrl: widget.videoUrl): widget.videoDetail;
 
   if (!mounted) return;
 
@@ -61,15 +37,19 @@ class _HttpsVideoPlayer extends State<HttpsVideoPlayer>{
   }
 
   // Extract the video URL from the API response.
-  final url = result.videoDetail[0]['video_location'].toString();
+  final jamFileLocation=widget.isSolo?'':'https://media05.fuzikapp.com/${result.videoDetail[0]['file_location'].toString()}';
+  print('Jam file location: $jamFileLocation');
+  final url =widget.isSolo? result.videoDetail[0]['video_location'].toString(): jamFileLocation;
   _controller = VideoPlayerController.networkUrl(
     Uri.parse(url), httpHeaders: {'Referer':'https://fuzikapp.com'}
   );
 
   try {
+    hasController=true;
     await _controller.initialize();
-
+    
     if (!mounted) {
+      hasController=false;
       _controller.dispose();
       return;
     }
@@ -79,10 +59,11 @@ class _HttpsVideoPlayer extends State<HttpsVideoPlayer>{
     });
   } catch (e) {
     if (!mounted) return;
-
+    _controller.dispose();
     setState(() {
       videoError = 'Failed to initialize video: $e';
       isLoading = false;
+      hasController=false;
     });
   }
 }
@@ -94,14 +75,16 @@ class _HttpsVideoPlayer extends State<HttpsVideoPlayer>{
   }
   @override
   void dispose(){
-    _controller.dispose();
+    if(hasController){
+     _controller.dispose();
+    }
     super.dispose();
   }
  @override
 Widget build(BuildContext context) {
   if (isLoading) {
     return const Center(
-      child: CircularProgressIndicator(),
+      child: SizedBox(width: 50, height: 50, child: CircularProgressIndicator(color:Colors.yellow)),
     );
   }
 
@@ -119,25 +102,36 @@ Widget build(BuildContext context) {
           children: [
             AspectRatio(
               aspectRatio: _controller.value.aspectRatio,
-              child: Stack(
-                children: [
-                  VideoPlayer(_controller),
-                    Center(
-                      child: ValueListenableBuilder<VideoPlayerValue>(
-                      valueListenable: _controller,
-                      builder: (context, value, child) {
-                      return IconButton(
-                        iconSize: 100,
-                        color:Colors.yellow,
-                        icon: Icon(value.isPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded),
-                        onPressed: () {
-                        value.isPlaying ? _controller.pause() : _controller.play();
-                      },
-                      );
-                      },
+              child: ValueListenableBuilder<VideoPlayerValue>(
+                valueListenable: _controller,
+                builder: (context, value, child) {
+                  // Show the poster until the video position moves past zero
+                  final showPoster = value.position == Duration.zero && !widget.isSolo;
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      VideoPlayer(_controller),
+                      if (showPoster)
+                        CachedNetworkImage(
+                          imageUrl: widget.previewUrl,
+                          fit:BoxFit.cover,
+                          placeholder: (context, url) => SizedBox(width:50, height: 50, child: CircularProgressIndicator(color: Colors.yellow,)),
+                          ),
+                      Center(
+                        child: IconButton(
+                          iconSize: 100,
+                          color: Colors.yellow,
+                          icon: Icon(value.isPlaying
+                              ? Icons.pause_circle_filled_rounded
+                              : Icons.play_circle_fill_rounded),
+                          onPressed: () {
+                            value.isPlaying ? _controller.pause() : _controller.play();
+                          },
+                        ),
                       ),
-                    )
-                ],
+                    ],
+                  );
+                },
               ),
             ),
               VideoProgressIndicator(_controller, allowScrubbing: true),
@@ -146,11 +140,3 @@ Widget build(BuildContext context) {
 }
 }
 
-
-class Video{
-  final String error;
-  final List<dynamic> videoDetail;
-  const Video({this.error='',this.videoDetail=const[]});
-
-  bool get hasError=>error.isNotEmpty;
-}
