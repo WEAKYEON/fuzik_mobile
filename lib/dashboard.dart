@@ -31,6 +31,18 @@ class DashboardContentState extends State<DashboardContent> {
   });
   }
 
+  void refreshDashboardData() {
+    setState(() {
+      _videosFuture =
+          fetchVideos(query: _searchQuery);
+
+      _collaborationVideosFuture =
+          fetchCollaborationVideos(
+            query: _searchQuery,
+          );
+    });
+  }
+
   Future<int> getJamViews({required String videoUrl}) async{
     final url=Uri.parse('https://engine01.fuzikapp.com/get_jam2_count?j=$videoUrl');
     try{
@@ -158,7 +170,16 @@ class DashboardContentState extends State<DashboardContent> {
                         onPressed: () {
                           setState(() {
                             _searchQuery = _searchController.text.trim();
-                            _videosFuture=fetchVideos(query: _searchQuery);
+
+                            if (isSoloSelected) {
+                              _videosFuture =
+                                  fetchVideos(query: _searchQuery);
+                            } else {
+                              _collaborationVideosFuture =
+                                  fetchCollaborationVideos(
+                                    query: _searchQuery,
+                                  );
+                            }
                           });
                         },
                         style: ElevatedButton.styleFrom(
@@ -229,7 +250,7 @@ class DashboardContentState extends State<DashboardContent> {
                 
                     final title = video['video_title']?.toString() ?? '';
                     final artist = video['musician_name']?.toString() ?? '';
-                    final views = '${video['views'] ?? 0} views';
+                    final views = '${video['view_count'] ?? 0} views';
                     final preview = video['preview']?.toString()??'';
                     final profileUrl = video['musician_profile_pic']?.toString() ?? '';
                     final youtubeCode=video['youtube_url'];
@@ -245,9 +266,8 @@ class DashboardContentState extends State<DashboardContent> {
                       profileUrl,
                       isSolo: isSoloSelected,
                       isPortrait: true,
-                      onTap: () {
-                        
-                          Navigator.push(
+                      onTap: () async {
+                        await Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (context) => ViewPlayScreen(
@@ -262,6 +282,12 @@ class DashboardContentState extends State<DashboardContent> {
                               ),
                             ),
                           );
+                        if (!mounted) return;
+
+                        setState(() {
+                          _videosFuture =
+                              fetchVideos(query: _searchQuery);
+                        });
                         
                       },
                     );
@@ -337,24 +363,29 @@ class DashboardContentState extends State<DashboardContent> {
                       profileUrl,
                       isPortrait: false,
                       isSolo: isSoloSelected,
-                      onTap: () {
-                        
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ViewPlayScreen(
-                                title: title,
-                                artist: artist,
-                                views: views,
-                                youTubeCode :youtubeCode,
-                                profileUrl: profileUrl,
-                                description: description,
-                                videoUrl: videoUrl,
-                                musicianEmail: musicanEmail,
-                              ),
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ViewPlayScreen(
+                              title: title,
+                              artist: artist,
+                              views: views,
+                              youTubeCode: youtubeCode,
+                              profileUrl: profileUrl,
+                              description: description,
+                              videoUrl: videoUrl,
+                              musicianEmail: musicanEmail,
                             ),
-                          );
-                        
+                          ),
+                        );
+
+                        if (!mounted) return;
+
+                        setState(() {
+                          _videosFuture =
+                              fetchVideos(query: _searchQuery);
+                        });
                       },
                     );
                   },
@@ -427,22 +458,30 @@ class DashboardContentState extends State<DashboardContent> {
                       isPortrait: false,
                       isSolo: isSoloSelected,
                       videoUrl: videoUrl,
-                      onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => JamWatchScreen(
-                                title: title,
-                                youTubeCode:youtubeCode,
-                                profileUrl: profileUrl,
-                                description: description,
-                                videoUrl: videoUrl,
-                                isSolo:isSoloSelected,
-                                previewUrl:preview
-                              ),
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => JamWatchScreen(
+                              title: title,
+                              youTubeCode: youtubeCode,
+                              profileUrl: profileUrl,
+                              description: description,
+                              videoUrl: videoUrl,
+                              isSolo: isSoloSelected,
+                              previewUrl: preview,
                             ),
-                          );
-                        
+                          ),
+                        );
+
+                        if (!mounted) return;
+
+                        setState(() {
+                          _collaborationVideosFuture =
+                              fetchCollaborationVideos(
+                                query: _searchQuery,
+                              );
+                        });
                       },
                     );
                   },

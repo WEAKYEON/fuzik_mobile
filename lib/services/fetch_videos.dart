@@ -25,6 +25,37 @@ Future<bool> hasNetwork() async {
   return !results.every((r) => r == ConnectivityResult.none);
 }
 
+Future<int> getPlay2ViewCount(String videoUrl) async {
+  if (videoUrl.isEmpty) return 0;
+
+  try {
+    final response = await http.get(
+      Uri.parse(
+        'https://engine01.fuzikapp.com/get_play2_count'
+            '?p=${Uri.encodeComponent(videoUrl)}',
+      ),
+      headers: const {
+        'Referer': 'https://fuzikapp.com',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+
+      if (data is List && data.isNotEmpty) {
+        return int.tryParse(
+          data[0]['view_count']?.toString() ?? '0',
+        ) ??
+            0;
+      }
+    }
+  } catch (e) {
+    debugPrint('GET PLAY VIEW COUNT ERROR: $e');
+  }
+
+  return 0;
+}
+
 //Fetch Solo videos
 Future<FetchVideos> fetchVideos({String query = ''}) async {
   if (!await hasNetwork()) {
@@ -60,9 +91,41 @@ Future<FetchVideos> fetchVideos({String query = ''}) async {
       return const FetchVideos(error: 'Failed to load videos');
     }
 
+    final landscape =
+    List<Map<String, dynamic>>.from(
+      jsonDecode(lResponse.body),
+    );
+
+    final portrait =
+    List<Map<String, dynamic>>.from(
+      jsonDecode(pResponse.body),
+    );
+
+    await Future.wait([
+      ...landscape.map((video) async {
+        final videoUrl =
+            video['url']?.toString() ?? '';
+
+        if (videoUrl.isNotEmpty) {
+          video['view_count'] =
+          await getPlay2ViewCount(videoUrl);
+        }
+      }),
+
+      ...portrait.map((video) async {
+        final videoUrl =
+            video['url']?.toString() ?? '';
+
+        if (videoUrl.isNotEmpty) {
+          video['view_count'] =
+          await getPlay2ViewCount(videoUrl);
+        }
+      }),
+    ]);
+
     return FetchVideos(
-      landscape: List<Map<String, dynamic>>.from(jsonDecode(lResponse.body)),
-      portrait: List<Map<String, dynamic>>.from(jsonDecode(pResponse.body)),
+      landscape: landscape,
+      portrait: portrait,
     );
   } on TimeoutException {
     return const FetchVideos(error: 'The connection is too slow. Please try again.');

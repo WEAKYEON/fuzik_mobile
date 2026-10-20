@@ -236,8 +236,9 @@ class _JamWatchScreenState extends State<JamWatchScreen> {
   @override
   Widget build(BuildContext context) {
     final ready = !isLoading && videoInitializationError.isEmpty;
-    final title =
-        widget.title.isNotEmpty ? cleanText(widget.title) : jamTitle;
+    final title = jamTitle.isNotEmpty
+        ? jamTitle
+        : cleanText(widget.title);
     final description = cleanText(
       widget.description.isNotEmpty ? widget.description : apiDescription,
     );
@@ -359,29 +360,6 @@ class _JamWatchScreenState extends State<JamWatchScreen> {
                 style: TextStyle(color: Colors.grey[400], fontSize: 12),
               ),
             ],
-          ),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) =>
-                    const CollaborationContent(showBackButton: true),
-              ),
-            );
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFFFD600),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            elevation: 0,
-          ),
-          child: const Text(
-            'Join Jam',
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
           ),
         ),
       ],

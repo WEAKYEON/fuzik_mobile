@@ -8,6 +8,9 @@ import 'login_screen.dart';
 import 'edit_profile.dart';
 import 'change_password.dart';
 import 'wallet.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:cached_network_image/cached_network_image.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -17,8 +20,11 @@ class MainLayout extends StatefulWidget {
 }
 
 class _MainLayoutState extends State<MainLayout> {
+  final GlobalKey<DashboardContentState> _dashboardKey =
+  GlobalKey<DashboardContentState>();
   int _selectedIndex = 0; 
   String _displayName = 'User';
+  String _profilePic = '';
   
   @override
   void initState() {
@@ -29,7 +35,55 @@ class _MainLayoutState extends State<MainLayout> {
       print(user);
       _displayName = user.email!.split('@')[0].isNotEmpty 
           ? user.email!.split('@')[0] 
-          : 'Thanat';
+          : 'User';
+
+      _loadProfile();
+    }
+  }
+
+  Future<void> _loadProfile() async {
+    final user =
+        Supabase.instance.client.auth.currentUser;
+
+    if (user == null || user.email == null) {
+      return;
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse(
+          'https://engine01.fuzikapp.com/musician2_detail'
+              '?email=${Uri.encodeComponent(user.email!)}',
+        ),
+      );
+
+      if (response.statusCode != 200) {
+        return;
+      }
+
+      final data = jsonDecode(response.body);
+
+      if (data is List && data.isNotEmpty) {
+        final profilePic =
+            data[0]['profile_pic']?.toString() ?? '';
+
+        final displayName =
+            data[0]['display_name']?.toString() ?? '';
+
+        if (!mounted) return;
+
+        setState(() {
+          _profilePic = profilePic;
+
+          //debugPrint('PROFILE PIC: $_profilePic');
+
+          if (displayName.isNotEmpty) {
+            _displayName = displayName;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('PROFILE LOAD ERROR: $e');
     }
   }
 
@@ -74,7 +128,9 @@ class _MainLayoutState extends State<MainLayout> {
         child: IndexedStack(
           index: _selectedIndex,
           children: [
-            const DashboardContent(),
+            DashboardContent(
+              key: _dashboardKey,
+            ),
             UploadContent(isActive: _selectedIndex == 1),
              InventoryContent(isActive: _selectedIndex == 2,
           ),
@@ -90,7 +146,15 @@ class _MainLayoutState extends State<MainLayout> {
         selectedItemColor: const Color(0xFFFFD600),
         unselectedItemColor: Colors.white54,
         currentIndex: _selectedIndex,
-        onTap: (index) => setState(() => _selectedIndex = index),
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+
+          if (index == 0) {
+            _dashboardKey.currentState?.refreshDashboardData();
+          }
+        },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
           BottomNavigationBarItem(icon: Icon(Icons.upload), label: 'Upload'),
@@ -134,10 +198,36 @@ class _MainLayoutState extends State<MainLayout> {
         ),
         child: Row(
           children: [
-            const CircleAvatar(
-              radius: 12,
-              backgroundColor: Colors.grey,
-              child: Icon(Icons.person, size: 16, color: Colors.white),
+            ClipOval(
+              child: Container(
+                width: 24,
+                height: 24,
+                color: Colors.grey,
+                child: _profilePic.isNotEmpty
+                    ? CachedNetworkImage(
+                  imageUrl: _profilePic.startsWith('http')
+                      ? _profilePic
+                      : 'https://media05.fuzikapp.com/$_profilePic',
+                  httpHeaders: const {
+                    'Referer': 'https://fuzikapp.com',
+                  },
+                  fit: BoxFit.cover,
+                  width: 24,
+                  height: 24,
+                  errorWidget: (context, url, error) {
+                    return const Icon(
+                      Icons.person,
+                      size: 16,
+                      color: Colors.white,
+                    );
+                  },
+                )
+                    : const Icon(
+                  Icons.person,
+                  size: 16,
+                  color: Colors.white,
+                ),
+              ),
             ),
             if (!isMobile) const SizedBox(width: 8),
             if (!isMobile) Text(_displayName, style: const TextStyle(color: Colors.white, fontSize: 12)),
