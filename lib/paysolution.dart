@@ -1,5 +1,9 @@
-import 'package:flutter/material.dart';
+import 'dart:math';
 
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'paysolution_webview.dart';
 import 'wallet_api.dart';
 
 class PaySolution extends StatefulWidget {
@@ -15,17 +19,42 @@ class _PaySolutionState extends State<PaySolution> {
   static const Color _cardColor = Color(0xFF1B1B1B);
   static const Color _borderColor = Color(0xFF27272A);
 
-  static const Map<String, String> _referenceNumbers = {
-    'test': '000000000004',
-    'adagio': '000000000001',
-    'allegro': '000000000002',
-    'presto': '000000000003',
-  };
+  late final String _referenceNumber;
+  bool _submitting = false;
 
-  bool _confirmed = false;
+  @override
+  void initState() {
+    super.initState();
+    _referenceNumber = _generateRefno();
+  }
 
-  String get _referenceNumber =>
-      _referenceNumbers[widget.pack.code] ?? '000000000000';
+  static String _generateRefno() {
+    final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+    final random = (100 + Random().nextInt(900)).toString();
+    final combined = '$timestamp$random';
+    final last12 = combined.substring(combined.length - 12);
+    return last12.padLeft(12, '0');
+  }
+
+  Future<void> _submitPayment() async {
+    if (_submitting) return;
+    final email = Supabase.instance.client.auth.currentUser?.email;
+    if (email == null) return;
+
+    setState(() => _submitting = true);
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PaySolutionCheckout(
+          pack: widget.pack,
+          refno: _referenceNumber,
+          customerEmail: email,
+        ),
+      ),
+    );
+    if (mounted) setState(() => _submitting = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +63,7 @@ class _PaySolutionState extends State<PaySolution> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
-          child: _confirmed ? _buildSuccess() : _buildSummary(),
+          child: _buildSummary(),
         ),
       ),
     );
@@ -66,9 +95,10 @@ class _PaySolutionState extends State<PaySolution> {
           ),
         ),
         const SizedBox(height: 28),
-        _buildPrimaryButton('Confirm Purchase', () {
-          setState(() => _confirmed = true);
-        }),
+        _buildPrimaryButton(
+          _submitting ? 'Redirecting…' : 'Confirm Purchase',
+          _submitting ? null : _submitPayment,
+        ),
         const SizedBox(height: 16),
         const Text(
           'Coins are added to your PR balance instantly after payment. '
@@ -76,33 +106,6 @@ class _PaySolutionState extends State<PaySolution> {
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.white38, fontSize: 13, height: 1.4),
         ),
-      ],
-    );
-  }
-
-  Widget _buildSuccess() {
-    return Column(
-      children: [
-        const SizedBox(height: 72),
-        const Icon(Icons.check_circle, color: Color(0xFF4ADE80), size: 72),
-        const SizedBox(height: 20),
-        const Text(
-          'Payment successful',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          '$_referenceNumber · ฿${widget.pack.price} THB',
-          style: const TextStyle(color: Colors.white54, fontSize: 14),
-        ),
-        const SizedBox(height: 44),
-        _buildPrimaryButton('Back to Wallet', () {
-          Navigator.pop(context);
-        }),
       ],
     );
   }
@@ -154,7 +157,7 @@ class _PaySolutionState extends State<PaySolution> {
     );
   }
 
-  Widget _buildPrimaryButton(String label, VoidCallback onPressed) {
+  Widget _buildPrimaryButton(String label, VoidCallback? onPressed) {
     return SizedBox(
       width: double.infinity,
       height: 56,

@@ -51,6 +51,7 @@ class WalletApi {
   static const int freeCap = 200;
 
   static const List<CoinPack> defaultPacks = [
+    CoinPack(code: 'test', name: 'Test Pack', coinsLabel: '1 Coins', price: 2),
     CoinPack(code: 'adagio', name: 'Adagio Pack', coinsLabel: '50 Coins', price: 99),
     CoinPack(
       code: 'allegro',
@@ -75,9 +76,9 @@ class WalletApi {
       (dotenv.env['TOKEN_URL'] ?? 'https://tetrasolution.com/token_app/api')
           .replaceAll(RegExp(r'/+$'), '');
 
-  String get _realmFree => dotenv.env['REALM_FREE'] ?? 'REALM00000001';
+  String get _realmFree => dotenv.env['REALM_FREE'] ?? 'REALM00000002';
 
-  String get _realmPaid => dotenv.env['REALM_PAID'] ?? 'REALM00000002';
+  String get _realmPaid => dotenv.env['REALM_PAID'] ?? 'REALM00000001';
 
   String? get currentEmail => Supabase.instance.client.auth.currentUser?.email;
 

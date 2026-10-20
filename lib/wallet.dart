@@ -80,7 +80,7 @@ class _WalletState extends State<Wallet> {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Manage your coins and buy more when you need them.',
+                      'Manage your coins, see ways to earn, and check your activity history.',
                       style: TextStyle(color: Colors.white70, fontSize: 15),
                     ),
                     const SizedBox(height: 28),
