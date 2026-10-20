@@ -269,7 +269,7 @@ class _ViewPlayScreenState extends State<ViewPlayScreen> {
 
             widget.youTubeCode.isEmpty? HttpsVideoPlayer(videoUrl: widget.videoUrl):
             // Video player mockup
-           YouTubeScreen(youTubeurl: 'https://www.youtube.com/watch?v=$widget.youTubeCode'),
+           YouTubeScreen(youTubeurl: widget.youTubeCode),
 
           const SizedBox(height: 20),
 
