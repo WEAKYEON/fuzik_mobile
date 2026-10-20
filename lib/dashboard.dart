@@ -12,11 +12,11 @@ class DashboardContent extends StatefulWidget {
   const DashboardContent({super.key});
 
   @override
-  State<DashboardContent> createState() => _DashboardContentState();
+  State<DashboardContent> createState() => DashboardContentState();
 }
 
-class _DashboardContentState extends State<DashboardContent> {
-  bool isSoloSelected = true; 
+class DashboardContentState extends State<DashboardContent> {
+  bool isSoloSelected = true;
   final _searchController = TextEditingController();
   String _searchQuery = '';
   late Future<FetchVideos> _videosFuture;
@@ -69,6 +69,7 @@ class _DashboardContentState extends State<DashboardContent> {
 
   @override
   Widget build(BuildContext context) {
+    
     double screenWidth = MediaQuery.of(context).size.shortestSide;
     double paddingHorizontal = screenWidth < 600 ? 16.0 : 40.0;
     bool isTablet = screenWidth >= 600;
@@ -449,6 +450,12 @@ class _DashboardContentState extends State<DashboardContent> {
       ),
     );
   }
+  void refreshDashboard() {
+    setState(() {
+      _searchQuery = '';
+      _searchController.clear();
+    });
+  }
 
   Widget _buildVideoCard(
       String title,
@@ -482,7 +489,7 @@ class _DashboardContentState extends State<DashboardContent> {
               ),
               child: Stack(
                 children: [
-                   ClipRRect(
+                  ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: CachedNetworkImage(
                         imageUrl: preview,

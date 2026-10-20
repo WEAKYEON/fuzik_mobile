@@ -17,6 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
 
   bool _isLoading = false;
+  bool _obscurePassword = true;
 
   bool get _isFormValid {
     return _emailController.text.trim().isNotEmpty &&
@@ -27,10 +28,14 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await Supabase.instance.client.auth.signInWithPassword(
+      final response = await Supabase.instance.client.auth.signInWithPassword(
         email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+        password: _passwordController.text,
       );
+
+      debugPrint('LOGIN SUCCESS');
+      debugPrint('User: ${response.user?.email}');
+      debugPrint('Session: ${response.session != null}');
 
       if (mounted) {
         Navigator.pushReplacement(
@@ -41,17 +46,16 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } on AuthException catch (e) {
-      String errorMessage = 'Something went wrong. Please try again.';
-
-      if (e.message == 'Invalid login credentials') {
-        errorMessage = 'Invalid email or password.';
-      }
+      debugPrint('SUPABASE AUTH ERROR');
+      debugPrint('Message: ${e.message}');
+      debugPrint('Status code: ${e.statusCode}');
+      debugPrint('Code: ${e.code}');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              errorMessage,
+              '${e.message} (${e.statusCode ?? 'no status'})',
               style: const TextStyle(color: Colors.white),
             ),
             backgroundColor: Colors.redAccent,
@@ -59,13 +63,16 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
       }
-    } catch (e) {
-      // 3. ดัก Error ทั่วไปอื่นๆ (เช่น อินเทอร์เน็ตหลุด)
+    } catch (e, stackTrace) {
+      debugPrint('GENERAL LOGIN ERROR');
+      debugPrint('Error: $e');
+      debugPrint('Stack trace: $stackTrace');
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'An error occurred: ${e.toString()}',
+              'Login error: $e',
               style: const TextStyle(color: Colors.white),
             ),
             backgroundColor: Colors.redAccent,
@@ -91,178 +98,183 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: LayoutBuilder(
-        builder: (BuildContext context,BoxConstraints constraints){
-          final isTablet = constraints.maxWidth >=600;
-        return Stack(
-          children: [
-            Positioned.fill(
-              child: Image.asset(
-                'assets/images/background_login.jpg',
-                fit: BoxFit.cover,
-              ),
-            ),
-        
-            Center(
-              child: SingleChildScrollView(
-                padding:  EdgeInsets.symmetric(
-                  horizontal:isTablet?140:24,
-                  ),
-                child: Container(
-                  padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Text(
-                        'Fuzik Collaboration Login',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-        
-                      const SizedBox(height: 32),
-        
-                      _buildLabel('Email'),
-                      _buildInput(
-                        _emailController,
-                        'Enter your email',
-                      ),
-        
-                      const SizedBox(height: 20),
-        
-                      _buildLabel('Password'),
-                      _buildInput(
-                        _passwordController,
-                        'Enter your password',
-                        obscure: true,
-                      ),
-        
-                      const SizedBox(height: 4),
-        
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                const ForgotPassword(),
-                              ),
-                            );
-                          },
-                          child: const Text(
-                            'Forgot Password?',
-                            style: TextStyle(
-                              color: Color(0xFFD68910),
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-        
-                      const SizedBox(height: 8),
-        
-                      // Login button
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: _isFormValid && !_isLoading
-                              ? [
-                            BoxShadow(
-                              color: const Color(0xFFFFD600)
-                                  .withValues(alpha: 0.6),
-                              blurRadius: 20,
-                              spreadRadius: 2,
-                            ),
-                          ]
-                              : [],
-                        ),
-                        child: ElevatedButton(
-                          onPressed:
-                          _isFormValid && !_isLoading ? _signIn : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFFD600),
-                            disabledBackgroundColor:
-                            Colors.grey.shade400,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 32,
-                              vertical: 14,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: _isLoading
-                              ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              color: Colors.black,
-                              strokeWidth: 2,
-                            ),
-                          )
-                              : const Text(
-                            'Login',
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                      ),
-        
-                      const SizedBox(height: 12),
-        
-                      // Sign Up link
-                      Center(
-                        child: RichText(
-                          text: TextSpan(
-                            style: const TextStyle(
-                              color: Colors.black87,
-                              fontSize: 14,
-                            ),
-                            children: [
-                              const TextSpan(
-                                text: "Don't have an account? ",
-                              ),
-                              TextSpan(
-                                text: 'Sign Up',
-                                style: const TextStyle(
-                                  color: Color(0xFFD68910),
-                                  fontWeight: FontWeight.bold,
-                                  decoration: TextDecoration.underline,
-                                ),
-                                recognizer: TapGestureRecognizer()
-                                  ..onTap = () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => SignupPage(),
-                                      ),
-                                    );
-                                  },
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
+          builder: (BuildContext context,BoxConstraints constraints){
+            final isTablet = constraints.maxWidth >=600;
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: Image.asset(
+                    'assets/images/background_login.jpg',
+                    fit: BoxFit.cover,
                   ),
                 ),
-              ),
-            ),
-          ],
-        );
-        }
+
+                Center(
+                  child: SingleChildScrollView(
+                    padding:  EdgeInsets.symmetric(
+                      horizontal:isTablet?140:24,
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.all(32),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Text(
+                            'Fuzik Collaboration Login',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+
+                          const SizedBox(height: 32),
+
+                          _buildLabel('Email'),
+                          _buildInput(
+                            _emailController,
+                            'Enter your email',
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          _buildLabel('Password'),
+                          _buildInput(
+                            _passwordController,
+                            'Enter your password',
+                            obscure: _obscurePassword,
+                            onToggleVisibility: () {
+                              setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              });
+                            },
+                          ),
+
+                          const SizedBox(height: 4),
+
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                    const ForgotPassword(),
+                                  ),
+                                );
+                              },
+                              child: const Text(
+                                'Forgot Password?',
+                                style: TextStyle(
+                                  color: Color(0xFFD68910),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          // Login button
+                          Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: _isFormValid && !_isLoading
+                                  ? [
+                                BoxShadow(
+                                  color: const Color(0xFFFFD600)
+                                      .withValues(alpha: 0.6),
+                                  blurRadius: 20,
+                                  spreadRadius: 2,
+                                ),
+                              ]
+                                  : [],
+                            ),
+                            child: ElevatedButton(
+                              onPressed:
+                              _isFormValid && !_isLoading ? _signIn : null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFFD600),
+                                disabledBackgroundColor:
+                                Colors.grey.shade400,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 32,
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: _isLoading
+                                  ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  color: Colors.black,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                                  : const Text(
+                                'Login',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          // Sign Up link
+                          Center(
+                            child: RichText(
+                              text: TextSpan(
+                                style: const TextStyle(
+                                  color: Colors.black87,
+                                  fontSize: 14,
+                                ),
+                                children: [
+                                  const TextSpan(
+                                    text: "Don't have an account? ",
+                                  ),
+                                  TextSpan(
+                                    text: 'Sign Up',
+                                    style: const TextStyle(
+                                      color: Color(0xFFD68910),
+                                      fontWeight: FontWeight.bold,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                    recognizer: TapGestureRecognizer()
+                                      ..onTap = () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => SignupPage(),
+                                          ),
+                                        );
+                                      },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }
       ),
     );
   }
@@ -284,6 +296,7 @@ class _LoginScreenState extends State<LoginScreen> {
       TextEditingController controller,
       String hint, {
         bool obscure = false,
+        VoidCallback? onToggleVisibility,
       }) {
     return TextField(
       controller: controller,
@@ -305,6 +318,17 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         filled: true,
         fillColor: const Color(0xFFF4F7FC),
+        suffixIcon: onToggleVisibility != null
+            ? IconButton(
+          icon: Icon(
+            obscure
+                ? Icons.visibility_off
+                : Icons.visibility,
+            color: Colors.grey,
+          ),
+          onPressed: onToggleVisibility,
+        )
+            : null,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide.none,

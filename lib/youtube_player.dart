@@ -43,7 +43,7 @@ class _YouTubeScreenState extends State<YouTubeScreen>{
     YoutubePlayerThumbnail(
     controller: controller,
     playIcon:IconButton(
-      icon: const Icon(Icons.play_circle_fill_rounded,color: Colors.yellow,size: 100,),
+      icon: const Icon(Icons.play_circle_fill_rounded,color: Colors.yellow,size: 70,),
       onPressed: (){
         setState(() {
           _startvideo=true;

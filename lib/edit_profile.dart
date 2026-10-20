@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -22,6 +21,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   static const String mediaBaseUrl =
       'https://media05.fuzikapp.com';
 
+  static const Map<String, String> _mediaHeaders = {
+    'Referer': 'https://www.fuzikapp.com/',
+  };
+
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _displayNameController = TextEditingController();
@@ -33,7 +36,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _isLoading = false;
 
   File? _selectedImage;
-
   String? _profilePicturePath;
 
   @override
@@ -68,11 +70,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return '$mediaBaseUrl/$normalizedPath';
   }
 
-
   Future<void> _loadProfile() async {
-    final user = Supabase.instance.client.auth.currentUser;
+    final user =
+        Supabase.instance.client.auth.currentUser;
 
     if (user == null || user.email == null) {
+      print('LOAD PROFILE: No logged-in user.');
       return;
     }
 
@@ -84,8 +87,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ),
       );
 
-      print('Profile status: ${response.statusCode}');
-      print('Profile response: ${response.body}');
+      print(
+        'PROFILE STATUS: ${response.statusCode}',
+      );
+
+      print(
+        'PROFILE RESPONSE: ${response.body}',
+      );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -96,12 +104,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           final profilePic =
           profile['profile_pic']?.toString();
 
-          print('PROFILE PIC FROM API: $profilePic');
+          print(
+            'PROFILE PIC FROM API: $profilePic',
+          );
 
           print(
-            'PROFILE PIC FULL URL: '
-                '${_getProfileImageUrl(profilePic)}',
+            'PROFILE IMAGE URL: ${_getProfileImageUrl(profilePic)}',
           );
+
+
 
           if (!mounted) return;
 
@@ -132,7 +143,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Profile not found.'),
+                content: Text(
+                  'Profile not found.',
+                ),
               ),
             );
           }
@@ -150,7 +163,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         }
       }
     } catch (e) {
-      print('LOAD PROFILE ERROR: $e');
+      print(
+        'LOAD PROFILE ERROR: $e',
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -187,7 +202,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             '&new_value=${Uri.encodeComponent(value)}',
       );
 
-      print('UPDATE URL: $url');
+      print(
+        'UPDATE URL: $url',
+      );
 
       final response = await http.get(url);
 
@@ -253,7 +270,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         return MediaType('image', 'jpeg');
     }
   }
-
 
   Future<String?> _uploadProfileImage(
       File imageFile,
@@ -431,7 +447,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-
   void _updateFormValidity() {
     final isValid =
         _firstNameController.text
@@ -460,7 +475,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-
   Future<void> _saveChanges() async {
     if (!_isFormValid || _isLoading) {
       return;
@@ -473,8 +487,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     bool allSuccess = true;
 
     try {
-      //  UPDATE EDITABLE TEXT FIELDS
-
       final fields = {
         'first_name':
         _firstNameController.text.trim(),
@@ -493,7 +505,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       };
 
       for (final entry in fields.entries) {
-        final success = await _updateField(
+        final success =
+        await _updateField(
           entry.key,
           entry.value,
         );
@@ -503,7 +516,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         }
       }
 
-      // UPLOAD PROFILE IMAGE
 
       if (_selectedImage != null) {
         final uploadedPath =
@@ -550,8 +562,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         }
       }
 
-      //  SHOW RESULT
-
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -561,7 +571,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ? 'Profile changes saved.'
                 : 'Some profile changes failed.',
           ),
-          backgroundColor: allSuccess
+          backgroundColor:
+          allSuccess
               ? const Color(0xFF2E7D32)
               : Colors.redAccent,
           behavior:
@@ -574,8 +585,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               'Failed to save profile: $e',
@@ -596,7 +606,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  // PICK IMAGE FROM GALLERY
 
   Future<void> _pickProfileImage() async {
     try {
@@ -609,9 +618,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       );
 
       if (image != null) {
+        final file = File(image.path);
+
         setState(() {
-          _selectedImage =
-              File(image.path);
+          _selectedImage = file;
         });
 
         print(
@@ -620,7 +630,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
         print(
           'Selected image exists: '
-              '${await File(image.path).exists()}',
+              '${await file.exists()}',
         );
       }
     } catch (e) {
@@ -629,8 +639,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               'Failed to select image: $e',
@@ -641,8 +650,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-
-  // TAKE PHOTO
 
   Future<void> _takeProfilePhoto() async {
     try {
@@ -670,8 +677,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               'Failed to take photo: $e',
@@ -682,7 +688,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  // PROFILE PICTURE OPTIONS
 
   void _showProfilePictureOptions() {
     showModalBottomSheet(
@@ -765,7 +770,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   },
                 ),
 
-                // REMOVE PROFILE PICTURE
+                // REMOVE
 
                 ListTile(
                   leading: const Icon(
@@ -779,9 +784,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                   ),
                   onTap: () async {
-                    // IMPORTANT:
-                    // Capture the ScaffoldMessenger BEFORE
-                    // closing the bottom sheet.
                     final messenger =
                     ScaffoldMessenger.of(
                       this.context,
@@ -802,8 +804,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     if (success) {
                       setState(() {
                         _selectedImage = null;
-                        _profilePicturePath =
-                        null;
+                        _profilePicturePath = null;
                       });
 
                       messenger.showSnackBar(
@@ -833,7 +834,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
 
-
   @override
   void dispose() {
     _firstNameController.dispose();
@@ -849,6 +849,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // NETWORK IMAGE URL
     final profileImageUrl =
     _getProfileImageUrl(
       _profilePicturePath,
@@ -883,6 +884,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       body: Stack(
         children: [
+          // BACKGROUND IMAGE
 
           Positioned.fill(
             child: Image.asset(
@@ -890,6 +892,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               fit: BoxFit.cover,
             ),
           ),
+
+          // DARK OVERLAY
 
           Positioned.fill(
             child: Container(
@@ -948,7 +952,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       height: 18,
                     ),
 
-                    // PROFILE PICTURE
 
                     Center(
                       child:
@@ -960,8 +963,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           children: [
                             CircleAvatar(
                               radius: 48,
+
                               backgroundColor:
                               Colors.grey,
+
 
                               backgroundImage:
                               _selectedImage !=
@@ -973,6 +978,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                   null
                                   ? NetworkImage(
                                 profileImageUrl,
+                                headers:
+                                _mediaHeaders,
                               )
                                   : null,
 
@@ -990,6 +997,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                   : null,
                             ),
 
+
                             Positioned(
                               bottom: 0,
                               right: 0,
@@ -1002,7 +1010,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                                 decoration:
                                 const BoxDecoration(
-                                  color: Color(
+                                  color:
+                                  Color(
                                     0xFFFFD600,
                                   ),
                                   shape:
@@ -1012,8 +1021,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                                 child:
                                 const Icon(
-                                  Icons
-                                      .camera_alt,
+                                  Icons.camera_alt,
                                   size: 18,
                                   color:
                                   Colors.black,
@@ -1042,7 +1050,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       height: 16,
                     ),
 
-
                     _buildLabel(
                       'Last Name',
                     ),
@@ -1070,7 +1077,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       height: 16,
                     ),
 
-
                     _buildLabel(
                       'Phone Number',
                     ),
@@ -1090,7 +1096,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       height: 16,
                     ),
 
-
                     _buildLabel(
                       'Instrument Type',
                     ),
@@ -1103,7 +1108,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     const SizedBox(
                       height: 16,
                     ),
-
 
                     _buildLabel(
                       'Music Genre',
@@ -1229,7 +1233,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       const EdgeInsets.only(
         bottom: 8,
       ),
-
       child: Text(
         text,
         style: const TextStyle(
@@ -1241,7 +1244,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ),
     );
   }
-
 
   Widget _buildInput(
       TextEditingController controller,
@@ -1271,7 +1273,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       Colors.black,
 
       style: const TextStyle(
-        color: Colors.black87,
+        color:
+        Colors.black87,
         fontSize: 16,
         fontWeight:
         FontWeight.w500,
@@ -1315,4 +1318,3 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 }
-
