@@ -234,6 +234,7 @@ class DashboardContentState extends State<DashboardContent> {
                     final profileUrl = video['musician_profile_pic']?.toString() ?? '';
                     final youtubeCode=video['youtube_url'];
                     final videoUrl=video['url']?.toString() ??'';
+                    final musicianEmail=video['musician_email']?.toString()??'';
                     final description=video['description']?.toString() ??'';
                     
                     return _buildVideoCard(
@@ -257,6 +258,7 @@ class DashboardContentState extends State<DashboardContent> {
                                 profileUrl: profileUrl,
                                 description:description,
                                 videoUrl: videoUrl,
+                                musicianEmail:musicianEmail ,
                               ),
                             ),
                           );
@@ -326,6 +328,7 @@ class DashboardContentState extends State<DashboardContent> {
                     final youtubeCode=video['youtube_url'];
                     final description = video['description']?.toString()??'';
                     final videoUrl=video['url']?.toString()??'';
+                    final musicanEmail= video['musician_email']?.toString()??'';
                     return _buildVideoCard(
                       title,
                       artist,
@@ -347,6 +350,7 @@ class DashboardContentState extends State<DashboardContent> {
                                 profileUrl: profileUrl,
                                 description: description,
                                 videoUrl: videoUrl,
+                                musicianEmail: musicanEmail,
                               ),
                             ),
                           );

@@ -1,9 +1,5 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 import 'dashboard.dart';
 import 'upload.dart';
 import 'inventory.dart';
@@ -21,22 +17,9 @@ class MainLayout extends StatefulWidget {
 }
 
 class _MainLayoutState extends State<MainLayout> {
-  int _selectedIndex = 0;
-  final _dashboardKey = GlobalKey<DashboardContentState>();
-
+  int _selectedIndex = 0; 
   String _displayName = 'User';
-  String? _profilePicturePath;
-
-  static const String baseUrl =
-      'https://engine01.fuzikapp.com';
-
-  static const String mediaBaseUrl =
-      'https://media05.fuzikapp.com';
-
-  static const Map<String, String> _mediaHeaders = {
-    'Referer': 'https://www.fuzikapp.com/',
-  };
-
+  
   @override
   void initState() {
     super.initState();
@@ -52,14 +35,11 @@ class _MainLayoutState extends State<MainLayout> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth =
-        MediaQuery.of(context).size.width;
-
-    final isMobile = screenWidth < 600;
+    double screenWidth = MediaQuery.of(context).size.width;
+    bool isMobile = screenWidth < 600;
 
     return Scaffold(
       backgroundColor: Colors.black,
-
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
@@ -78,113 +58,45 @@ class _MainLayoutState extends State<MainLayout> {
             ),
           ],
         ),
-
         actions: [
           _buildStatusBadge('FuzikPremiumCoin.png'),
           const SizedBox(width: 8),
           _buildStatusBadge('FuzikNormalCoin.png'),
           const SizedBox(width: 8),
-
           Padding(
-            padding: const EdgeInsets.only(
-              right: 16,
-            ),
-            child: _buildProfileMenu(
-              isMobile,
-            ),
+            padding: const EdgeInsets.only(right: 16.0),
+            child: _buildProfileMenu(isMobile),
           ),
         ],
       ),
-
+      
       body: SafeArea(
         child: IndexedStack(
           index: _selectedIndex,
           children: [
-            DashboardContent(
-              key: _dashboardKey,
-            ),
-
-            UploadContent(
-              isActive: _selectedIndex == 1,
-              onUploadSuccess: () {
-                setState(() {
-                  _selectedIndex = 2;
-                });
-              },
-            ),
-
-            InventoryContent(
-              isActive: _selectedIndex == 2,
-            ),
-
+            const DashboardContent(),
+            UploadContent(isActive: _selectedIndex == 1),
+             InventoryContent(isActive: _selectedIndex == 2,
+          ),
             const CollaborationContent(),
-
-            const Wallet(),
+            const Wallet()
           ],
         ),
       ),
 
-      bottomNavigationBar:
-      BottomNavigationBar(
-        backgroundColor:
-        const Color(0xFF121212),
-
-        type:
-        BottomNavigationBarType.fixed,
-
-        selectedItemColor:
-        const Color(0xFFFFD600),
-
-        unselectedItemColor:
-        Colors.white54,
-
+      bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: const Color(0xFF121212),
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: const Color(0xFFFFD600),
+        unselectedItemColor: Colors.white54,
         currentIndex: _selectedIndex,
-
-        onTap: (index) {
-          if (index == 0 && _selectedIndex != 0) {
-            _dashboardKey.currentState?.refreshDashboard();
-          }
-
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
-
+        onTap: (index) => setState(() => _selectedIndex = index),
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(
-              Icons.dashboard,
-            ),
-            label: 'Dashboard',
-          ),
-
-          BottomNavigationBarItem(
-            icon: Icon(
-              Icons.upload,
-            ),
-            label: 'Upload',
-          ),
-
-          BottomNavigationBarItem(
-            icon: Icon(
-              Icons.grid_view,
-            ),
-            label: 'Inventory',
-          ),
-
-          BottomNavigationBarItem(
-            icon: Icon(
-              Icons.people,
-            ),
-            label: 'Collab',
-          ),
-
-          BottomNavigationBarItem(
-            icon: Icon(
-              Icons.account_balance_wallet_rounded,
-            ),
-            label: 'Wallet',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
+          BottomNavigationBarItem(icon: Icon(Icons.upload), label: 'Upload'),
+          BottomNavigationBarItem(icon: Icon(Icons.grid_view), label: 'Inventory'),
+          BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Collab'),
+          BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet_rounded), label: 'Wallet'),
         ],
       ),
     );
@@ -209,165 +121,61 @@ class _MainLayoutState extends State<MainLayout> {
     );
   }
 
-  Widget _buildProfileMenu(
-      bool isMobile,
-      ) {
-    final profileImageUrl =
-    _getProfileImageUrl(
-      _profilePicturePath,
-    );
-
+  Widget _buildProfileMenu(bool isMobile) {
     return PopupMenuButton<String>(
       offset: const Offset(0, 45),
-
       color: const Color(0xFF1E1E1E),
-
       child: Container(
-        padding:
-        const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 6,
-        ),
-
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: Colors.white10,
-          borderRadius:
-          BorderRadius.circular(20),
-          border: Border.all(
-            color: Colors.white24,
-          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white24),
         ),
-
         child: Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration:
-              const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.grey,
-              ),
-              clipBehavior:
-              Clip.antiAlias,
-
-              child: profileImageUrl != null
-                  ? Image.network(
-                profileImageUrl,
-                width: 28,
-                height: 28,
-                fit: BoxFit.cover,
-
-                headers:
-                _mediaHeaders,
-
-                loadingBuilder: (
-                    context,
-                    child,
-                    loadingProgress,
-                    ) {
-                  if (loadingProgress ==
-                      null) {
-                    return child;
-                  }
-
-                  return const Center(
-                    child:
-                    SizedBox(
-                      width: 12,
-                      height: 12,
-                      child:
-                      CircularProgressIndicator(
-                        strokeWidth: 1.5,
-                        color: Colors.white,
-                      ),
-                    ),
-                  );
-                },
-
-                errorBuilder: (
-                    context,
-                    error,
-                    stackTrace,
-                    ) {
-                  return const Icon(
-                    Icons.person,
-                    size: 18,
-                    color: Colors.white,
-                  );
-                },
-              )
-                  : const Icon(
-                Icons.person,
-                size: 18,
-                color: Colors.white,
-              ),
+            const CircleAvatar(
+              radius: 12,
+              backgroundColor: Colors.grey,
+              child: Icon(Icons.person, size: 16, color: Colors.white),
             ),
-
-            if (!isMobile)
-              const SizedBox(width: 8),
-
-            if (!isMobile)
-              Text(
-                _displayName,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                ),
-              ),
-
+            if (!isMobile) const SizedBox(width: 8),
+            if (!isMobile) Text(_displayName, style: const TextStyle(color: Colors.white, fontSize: 12)),
             const SizedBox(width: 4),
-
-            const Icon(
-              Icons.arrow_drop_down,
-              color: Colors.white70,
-              size: 16,
-            ),
+            const Icon(Icons.arrow_drop_down, color: Colors.white70, size: 16),
           ],
         ),
       ),
-
       onSelected: (value) async {
-        if (value == 'profile') {
-          await Navigator.push(
+        if (value == 'profile'){
+          Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) =>
-              const EditProfileScreen(),
+                builder: (context)=> const EditProfileScreen(),
             ),
           );
-
-          await _loadProfile();
         }
 
-        if (value == 'settings') {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) =>
-              const ChangePasswordScreen(),
-            ),
+        if (value == 'settings'){
+          Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context)=> const ChangePasswordScreen(),
+              ),
           );
         }
 
         if (value == 'logout') {
-          await Supabase.instance.client.auth
-              .signOut();
-
-          if (!mounted) return;
-
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(
-              builder: (context) =>
-              const LoginScreen(),
-            ),
-                (route) => false,
-          );
+          await Supabase.instance.client.auth.signOut();
+          if (mounted) {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const LoginScreen()),
+              (route) => false,
+            );
+          }
         }
       },
-
       itemBuilder: (context) => [
         const PopupMenuItem(
           value: 'profile',
@@ -378,9 +186,7 @@ class _MainLayoutState extends State<MainLayout> {
                 color: Colors.white,
                 size: 18,
               ),
-
               SizedBox(width: 8),
-
               Text(
                 'Edit Profile',
                 style: TextStyle(
@@ -401,9 +207,7 @@ class _MainLayoutState extends State<MainLayout> {
                 color: Colors.white,
                 size: 18,
               ),
-
               SizedBox(width: 8),
-
               Text(
                 'Settings',
                 style: TextStyle(
@@ -424,9 +228,7 @@ class _MainLayoutState extends State<MainLayout> {
                 color: Colors.redAccent,
                 size: 18,
               ),
-
               SizedBox(width: 8),
-
               Text(
                 'Logout',
                 style: TextStyle(

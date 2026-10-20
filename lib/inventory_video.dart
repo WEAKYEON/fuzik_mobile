@@ -540,7 +540,7 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
             clipBehavior: Clip.antiAlias,
             child: youtubeUrl.isNotEmpty
                 ? YouTubeScreen(
-              videourl: youtubeUrl,
+              youTubeurl: youtubeUrl,
             )
                 : const AspectRatio(
               aspectRatio: 16 / 9,
