@@ -3,9 +3,9 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  app_links_linux
   ffmpeg_kit_flutter_new_audio
   file_selector_linux
-  gtk
   url_launcher_linux
 )
 

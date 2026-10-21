@@ -720,7 +720,11 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                         future:_videosFuture,
                                         builder: (context, snapshot) {
                                         if (snapshot.connectionState == ConnectionState.waiting) {
-                                          return const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Color(0xFFFFD600))));
+                                          return ListView(
+                                            controller: scrollController,
+                                            padding: const EdgeInsets.only(top: 40),
+                                            children: [Center(child: const CircularProgressIndicator(color: Color(0xFFFFD600)),)],
+                                          );
                                         }
                                         final result=snapshot.data;
                                         if (result == null || result.hasError) {
