@@ -7,6 +7,7 @@ import 'jam_watch.dart';
 import 'package:cached_network_image/cached_network_image.dart'; 
 import 'package:fuzik_mobile/services/fetch_videos.dart';
 import 'package:http/http.dart' as http;
+import 'dart:math';
 
 class DashboardContent extends StatefulWidget {
   const DashboardContent({super.key});
@@ -41,6 +42,7 @@ class DashboardContentState extends State<DashboardContent> {
             query: _searchQuery,
           );
     });
+    refreshDashboard();
   }
 
   Future<int> getJamViews({required String videoUrl}) async{
@@ -247,7 +249,7 @@ class DashboardContentState extends State<DashboardContent> {
                   itemCount: videos.length,
                   itemBuilder: (context, index) {
                     final video = videos[index];
-                
+                    final isArtist=video['artist']?.toString()??'';
                     final title = video['video_title']?.toString() ?? '';
                     final artist = video['musician_name']?.toString() ?? '';
                     final views = '${video['view_count'] ?? 0} views';
@@ -266,6 +268,7 @@ class DashboardContentState extends State<DashboardContent> {
                       profileUrl,
                       isSolo: isSoloSelected,
                       isPortrait: true,
+                      isArtist: isArtist,
                       onTap: () async {
                         await Navigator.push(
                             context,
@@ -345,7 +348,7 @@ class DashboardContentState extends State<DashboardContent> {
                   itemCount: videos.length,
                   itemBuilder: (context, index) {
                     final video = videos[index];
-      
+                    final isArtist=video['artist']?.toString()??'';
                     final title = video['video_title']?.toString() ?? '';
                     final artist = video['musician_name']?.toString() ?? '';
                     final views = '${video['view_count'] ?? 0} views';
@@ -363,6 +366,7 @@ class DashboardContentState extends State<DashboardContent> {
                       profileUrl,
                       isPortrait: false,
                       isSolo: isSoloSelected,
+                      isArtist: isArtist,
                       onTap: () async {
                         await Navigator.push(
                           context,
@@ -510,9 +514,10 @@ class DashboardContentState extends State<DashboardContent> {
         required bool isSolo,
         VoidCallback? onTap,
         int retry = 0,
-        String videoUrl=''
+        String videoUrl='',
+        String isArtist=''
       }) {
-    
+    bool checkArtist= isArtist=='Yes';
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -570,6 +575,26 @@ class DashboardContentState extends State<DashboardContent> {
                       ),
                     ),
                   ),
+                  checkArtist? Positioned(
+                    left: -30,
+                    top: 15,
+                    child: Transform.rotate(
+                      angle:-pi/4,
+                      child: Container(
+                        alignment: Alignment.center,
+                        width: 120,
+                        height: 30,
+                        color:Colors.yellow,
+                        child:  Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('Artist',style: TextStyle(color:Colors.black,fontWeight: FontWeight.bold ),),
+                            Icon(Icons.music_note_rounded, color:Colors.black,size:20)
+                          ],
+                        ),
+                      ),
+                      )
+                      ):Container(),
                 ],
               ),
             ),
