@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dashboard.dart';
 import 'upload.dart';
 import 'inventory.dart';
 import 'collaboration.dart';
+import 'wallet.dart';
+import 'wallet_api.dart';
 import 'login_screen.dart';
 import 'edit_profile.dart';
 import 'change_password.dart';
@@ -22,10 +26,13 @@ class MainLayout extends StatefulWidget {
 class _MainLayoutState extends State<MainLayout> {
   final GlobalKey<DashboardContentState> _dashboardKey =
   GlobalKey<DashboardContentState>();
-  int _selectedIndex = 0; 
+  int _selectedIndex = 0;
   String _displayName = 'User';
   String _profilePic = '';
-  
+
+  final WalletApi _walletApi = WalletApi();
+  Timer? _balanceTimer;
+
   @override
   void initState() {
     super.initState();
@@ -85,6 +92,19 @@ class _MainLayoutState extends State<MainLayout> {
     } catch (e) {
       debugPrint('PROFILE LOAD ERROR: $e');
     }
+
+    _walletApi.fetchSummary();
+    _balanceTimer = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _walletApi.fetchSummary(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _balanceTimer?.cancel();
+    _walletApi.dispose();
+    super.dispose();
   }
 
   @override
@@ -113,9 +133,26 @@ class _MainLayoutState extends State<MainLayout> {
           ],
         ),
         actions: [
-          _buildStatusBadge('FuzikPremiumCoin.png'),
-          const SizedBox(width: 8),
-          _buildStatusBadge('FuzikNormalCoin.png'),
+          ValueListenableBuilder<WalletSummary?>(
+            valueListenable: walletSummaryNotifier,
+            builder: (context, summary, _) {
+              final pr = summary?.paidBalance;
+              final fz = summary?.freeBalance;
+              return Row(
+                children: [
+                  _buildStatusBadge(
+                    'PR ${pr ?? '—'}/∞',
+                    const Color(0xFF8AB4F8),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildStatusBadge(
+                    'FZ ${fz ?? '—'}/200',
+                    const Color(0xFFFFD600),
+                  ),
+                ],
+              );
+            },
+          ),
           const SizedBox(width: 8),
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
@@ -135,7 +172,7 @@ class _MainLayoutState extends State<MainLayout> {
              InventoryContent(isActive: _selectedIndex == 2,
           ),
             const CollaborationContent(),
-            const Wallet()
+            const Wallet(),
           ],
         ),
       ),
@@ -167,20 +204,12 @@ class _MainLayoutState extends State<MainLayout> {
   }
 
 
-  Widget _buildStatusBadge(String imageUrl) {
+  Widget _buildStatusBadge(String text, Color color) {
     return Center(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: const Color.fromARGB(255, 42, 41, 41),
-          borderRadius: BorderRadius.circular(25)
-        ),
-        child: Row(
-          children: [
-          Image.asset('assets/images/$imageUrl',width: 35,height: 35,),
-          SizedBox(width: 5,),
-          Text('200',style: TextStyle(fontSize: 15,fontWeight: FontWeight.w900),)
-          ]),
+        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(20)),
+        child: Text(text, style: const TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold)),
       ),
     );
   }
