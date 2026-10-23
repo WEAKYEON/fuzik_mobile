@@ -24,8 +24,8 @@ class _ChooseVideo2State extends State<ChooseVideo2>{
    String searchQuery = '';
    late List orientations;
    late Future<FetchVideos> _videosFuture;
-  final DraggableScrollableController _sheetController =DraggableScrollableController();
-    static const _sheetOpenSize=0.45;
+   final DraggableScrollableController _sheetController =DraggableScrollableController();
+   static const _sheetOpenSize=0.45;
     
     void reload(){
       setState(() {
@@ -310,6 +310,66 @@ Widget buildLayoutPreview(String layoutName, List<dynamic> selectedVideos, int t
             );
           }
         );
+        case '2_05':
+         return LayoutBuilder(builder: ((context, constraints) {
+          final widthOfLayout=constraints.maxWidth;
+          final heightOfLayout=constraints.maxHeight;
+            return Row(
+              children: [
+                Container(
+                  width: widthOfLayout/2,
+                  height: heightOfLayout,
+                  child:Column(
+                    children: [
+                      SizedBox(
+                        height: heightOfLayout/2,
+                        child:_slot(selectedVideos, 0)
+                      ),
+                      SizedBox(
+                        height: heightOfLayout/2,
+                        child: _slot(selectedVideos, 1),
+                      )
+                    ],
+                  )
+                ),
+                Container(
+                  width: widthOfLayout/2,
+                  height: heightOfLayout,
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        height: heightOfLayout/3,
+                        child:DecorativeWaveform(
+                          width: widthOfLayout/2,
+                          height: heightOfLayout/3,
+                          extraNumberOfAmplitudes: 20,
+                        ),
+                      ),
+                      SizedBox(
+                        height: heightOfLayout/3,
+                        child:DecorativeWaveform(
+                          width: widthOfLayout/2,
+                          height: heightOfLayout/3,
+                          extraNumberOfAmplitudes: 20,
+                        ),
+                      ),
+                      SizedBox(
+                        height: heightOfLayout/3,
+                        child:DecorativeWaveform(
+                          width: widthOfLayout/2,
+                          height: heightOfLayout/3,
+                          extraNumberOfAmplitudes: 20,
+                        ),
+                      ),
+                      
+                    ],
+                  ),
+                )
+              ],
+            );
+         }
+         )       
+         );
         case '2_02':
         return Stack(
           children:[
@@ -611,11 +671,12 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                                       decoration: BoxDecoration(
                                                         border: BoxBorder.all(color:Colors.yellow,width: 1)
                                                       ),
-                                                      child:Image.network(
-                                                        video['preview'],
+                                                      child:CachedNetworkImage(
+                                                        imageUrl:video['preview'],
                                                         width: 100,
                                                         height: 100,
                                                         fit:BoxFit.cover,
+                                                        errorWidget: (context,url,error)=>Icon(Icons.broken_image_outlined),
                                                       )
                                                     ),
                                                     Positioned(
@@ -770,7 +831,7 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                               final video = videoData[index];
                                           
                                               final preview = video['preview']?.toString()??'';
-                                          
+                                              bool checkArtist= video['artist']?.toString().toLowerCase()=="yes" ;
                                               return GestureDetector(
                                                 onTap: ()async{
                                                   final alreadySelected = selectedVideos.any(
@@ -815,6 +876,7 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                                     ScaffoldMessenger.of(context).removeCurrentSnackBar();
                                                     ScaffoldMessenger.of(context).showSnackBar(
                                                       const SnackBar(
+                                                        backgroundColor: Colors.yellow,
                                                         content: Text('Wrong Video Orientation'),
                                                         duration: Duration(seconds: 2),
                                                         behavior: SnackBarBehavior.floating,
@@ -838,15 +900,39 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                                               border: Border.all(color: Colors.yellow, width: 1.5),
                                                               borderRadius: BorderRadiusGeometry.circular(8),
                                                             ),
-                                                            child: ClipRRect(
-                                                              borderRadius: BorderRadius.circular(8),
-                                                              child: CachedNetworkImage(
-                                                                imageUrl: preview,
-                                                                fit:BoxFit.cover,
-                                                                width: double.infinity,
-                                                                placeholder: (context, url) => Center(child: CircularProgressIndicator(color:Colors.yellow)),
-                                                                errorWidget: (context, url, error) => Icon(Icons.error),
+                                                            child: Stack(
+                                                              children: [
+                                                                ClipRRect(
+                                                                  borderRadius: BorderRadius.circular(8),
+                                                                  child: CachedNetworkImage(
+                                                                    imageUrl: preview,
+                                                                    fit:BoxFit.cover,
+                                                                    width: double.infinity,
+                                                                    placeholder: (context, url) => Center(child: CircularProgressIndicator(color:Colors.yellow)),
+                                                                    errorWidget: (context, url, error) => Icon(Icons.error),
+                                                                    ),
                                                                 ),
+                                                                checkArtist? Positioned(
+                                                                  left: -30,
+                                                                  top: 15,
+                                                                  child: Transform.rotate(
+                                                                    angle:-pi/4,
+                                                                    child: Container(
+                                                                      alignment: Alignment.center,
+                                                                      width: 120,
+                                                                      height: 30,
+                                                                      color:Colors.yellow,
+                                                                      child:  Row(
+                                                                        mainAxisAlignment: MainAxisAlignment.center,
+                                                                        children: [
+                                                                          Text('Artist',style: TextStyle(color:Colors.black,fontWeight: FontWeight.bold ),),
+                                                                          Icon(Icons.music_note_rounded, color:Colors.black,size:20)
+                                                                        ],
+                                                                      ),
+                                                                    ),
+                                                                    )
+                                                                    ):Container(),
+                                                              ],
                                                             ),
                                                           ),
                                                         ),
@@ -1001,7 +1087,7 @@ class DecorativeWaveformPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = color
-      ..strokeWidth = 2
+      ..strokeWidth = 2.5
       ..strokeCap = StrokeCap.square;
 
     final centerY = size.height / 2;

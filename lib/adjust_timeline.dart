@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:just_audio/just_audio.dart';
@@ -8,6 +10,8 @@ import 'package:ffmpeg_kit_flutter_new_audio/ffmpeg_kit.dart';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:just_waveform/just_waveform.dart';
+import 'package:fuzik_mobile/services/fetch_videos.dart';
+import 'dart:io';
 
 class AdjustTimelineScreen extends StatefulWidget {
   final String layoutName;
@@ -42,6 +46,7 @@ class _AdjustTimelineScreenState extends State<AdjustTimelineScreen> {
   static const double _gapAfterBadge = 20;
   static const double _gapAfterThumb = 12;
   late List<bool> _volumeOpen;
+  String audioInitializationError='';
   double guideSeconds=1.0;
   double get _guideX=> guideSeconds*pixelsPerSecond;
   bool get _anythingActive =>players.any((p) => p.playing) || _waiting.any((w) => w);
@@ -88,54 +93,104 @@ double get maxScroll =>(maxTimelineWidth - _viewportWidth).clamp(0.0, double.inf
   return maxWidth;
 }
 
-Future<File> getCachedAudio(String videoCode, String videoUrl) async{
-    final cacheDir= await getTemporaryDirectory();
-    final audioFile=File('${cacheDir.path}/$videoCode.mp3');
-    if(await audioFile.exists()){
-      print('Using cached audio: ${audioFile.path}');
-      return audioFile;
-    }
+Future<File> getCachedAudio(String videoCode, String videoUrl) async {
+  final cacheDir = await getTemporaryDirectory();
+  final audioFile = File('${cacheDir.path}/$videoCode.mp3');
+  final videoFile = File('${cacheDir.path}/$videoCode.mp4');
+  final partFile = File('${cacheDir.path}/$videoCode.mp4.part');
 
-    final videoFile = File('${cacheDir.path}/$videoCode.mp4',);
-    if(!await videoFile.exists()){
-      final response=await http.get(
-        Uri.parse(videoUrl),
-        headers: {
-          'Referer':"https://fuzikapp.com",
-        },
-      );
+  // 1. Valid cached audio: use it
+  if (await audioFile.exists() && await audioFile.length() > 0) {
+    debugPrint('Using cached audio: ${audioFile.path}');
+    return audioFile;
+  }
+
+  // 2. Remove leftovers from earlier failed runs 
+  for (final f in [videoFile, partFile, audioFile]) {
+    if (await f.exists()) await f.delete();
+  }
+
+  try {
+    // 3. Download to a .part file, so a half-finished download is never mistaken for a video
+    final client = http.Client();
+    try {
+      final request = http.Request('GET', Uri.parse(videoUrl))
+        ..headers['Referer'] = 'https://fuzikapp.com';
+
+      final response =
+          await client.send(request).timeout(const Duration(seconds: 60));
       if (response.statusCode != 200) {
+        throw Exception('Failed to download video: ${response.statusCode}');
+      }
+
+      final type = (response.headers['content-type'] ?? '').toLowerCase();
+      await response.stream
+          .pipe(partFile.openWrite())
+          .timeout(const Duration(minutes: 2));
+
+      // 4. Make sure we really got a video, not an error message
+      final size = await partFile.length();
+      if (size < 1024 || type.startsWith('text/') || type.contains('json')) {
+        final bytes = await partFile.readAsBytes();
+        final text = String.fromCharCodes(bytes.take(200));
         throw Exception(
-          'Failed to download video: ${response.statusCode}',
-        );
+            'Server did not return a video ($type, $size bytes): $text');
       }
-      await videoFile.writeAsBytes(response.bodyBytes);
+      await partFile.rename(videoFile.path);
+    } finally {
+      client.close();
     }
-    final session = await FFmpegKit.execute(
-      '-i "${videoFile.path}" -vn -c:a copy "${audioFile.path}"',
-    );
-    final returnCode = await session.getReturnCode();
 
-    if (returnCode?.isValueSuccess() ?? false) {
-      print('getCachedAudio: Audio extracted: ${audioFile.path}');
+    // 5. Extract the audio
+    Future<bool> runFfmpeg(List<String> args) async {
+      final session = await FFmpegKit.executeWithArguments(args);
+      final rc = await session.getReturnCode();
+      if (rc?.isValueSuccess() ?? false) return true;
+      debugPrint('FFmpeg failed (rc: $rc):\n${await session.getAllLogsAsString()}');
+      return false;
+    }
 
-      // Delete the video and will keep the audio only
-      if (await videoFile.exists()) {
-        await videoFile.delete();
-        print('getCachedAudio: Temporary video deleted.');
-      }
-      return audioFile;
-      }
+    // First try a straight copy (fast, no quality loss, works when the audio is MP3)
+    var ok = await runFfmpeg([
+      '-y', '-i', videoFile.path, '-vn', '-c:a', 'copy', audioFile.path,
+    ]);
+
+    // Fall back to re-encoding if the copy fails
+    if (!ok) {
+      if (await audioFile.exists()) await audioFile.delete();
+      ok = await runFfmpeg([
+        '-y', '-i', videoFile.path, '-vn',
+        '-c:a', 'libmp3lame', '-q:a', '4', audioFile.path,
+      ]);
+    }
+
+    if (!ok) throw Exception('FFmpeg failed to extract audio');
+
+    debugPrint('getCachedAudio: Audio extracted: ${audioFile.path}');
+    return audioFile;
+  } catch (e) {
     if (await audioFile.exists()) await audioFile.delete();
-    throw Exception('getCachedAudio: FFmpeg failed to extract audio');
+    rethrow;
+  } finally {
+    // Always remove the temporary video files, success or failure
+    if (await videoFile.exists()) await videoFile.delete();
+    if (await partFile.exists()) await partFile.delete();
+  }
 }
 
 Future<void> _initializeAudio() async{
+  if(!await hasNetwork()){
+    if(!mounted) return;
+    setState(() {
+      audioInitializationError="You are not connected to the internet. Please turn on mobile data or WiFi";
+    });
+    return;
+  }
     for(int i=0; i<widget.selectedVideos.length;i++){
       final videoCode=widget.selectedVideos[i]['url'];
       final videoPlay2WatchUrl=Uri.parse('https://engine01.fuzikapp.com/play2_watch?p=$videoCode');
       try{
-        final response= await http.get(videoPlay2WatchUrl);
+        final response= await http.get(videoPlay2WatchUrl).timeout(Duration(minutes: 1));
         final data= jsonDecode(response.body);
         
         final videoLocation=data[0]['video_location_120'];
@@ -144,7 +199,7 @@ Future<void> _initializeAudio() async{
         final audioFile = await getCachedAudio(
         videoCode,
         videoLocation,
-      );
+      ).timeout(Duration(minutes: 4));
       print('_initializeAudio: VIDEO $i AUDIO: ${audioFile.path}');
         try{
           await players[i].setFilePath(audioFile.path,);
@@ -152,11 +207,20 @@ Future<void> _initializeAudio() async{
         }catch(e){
           debugPrint('_initializeAudio: Failed to load audio $i : $e');
         }
-      }catch (e, stackTrace) {
-        
+      }on TimeoutException{
+        setState(() {
+          audioInitializationError="Sorry, the connection is too slow.";
+        });
+      }
+      catch (e, stackTrace) {
+        if(!mounted) return;
+        setState(() {
+          audioInitializationError="Sorry,there is an error while initializing the audio. Error: $e";
+        });
         print('_initializeAudioFunction: INITIALIZATION ERROR PLAYER $i');
         print(e);
         print(stackTrace);
+        return;
       }
     }
   }
@@ -241,7 +305,6 @@ Future<void> startOverAllTracks() async {
   _syncMasterIcon(); // now false, since nothing is playing
 }
 
-
 Future<void> generateWaveform(
   int index,
   File audioFile,
@@ -279,6 +342,78 @@ Future<void> generateWaveform(
     print(e);
     print(stackTrace);
   }
+}
+
+int get countArtistVideo=>widget.selectedVideos.where((v)=>v['artist']?.toString().toLowerCase()=="yes").length;
+bool get containArtist=> countArtistVideo>0;
+
+Future<bool> showArtistVideoDialog(BuildContext context) async {
+  bool agreed = false;
+
+  final result = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false, // tapping outside doesn't close it
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1C1C1C),
+            title: const Text(
+              'Collaboration with Artist',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Text(
+                        "You are using artist video, you will be redirect to payment page.\nNumber of artist video used: $countArtistVideo", 
+                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                    ),
+                  ),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    activeColor: const Color(0xFFFFD600),
+                    checkColor: Colors.black,
+                    value: agreed,
+                    onChanged: (v) => setDialogState(() => agreed = v ?? false),
+                    title: const Text(
+                      'I hereby consent that the purchases and coins spent are not refundable.',
+                      style: TextStyle(color: Colors.white, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+              ),
+              ElevatedButton(
+                // null disables the button until the box is ticked
+                onPressed: agreed ? () => Navigator.pop(context, true) : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFD600),
+                  foregroundColor: Colors.black,
+                ),
+                child: const Text('Accept'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+
+  return result ?? false;
 }
 
 @override
@@ -328,10 +463,10 @@ void dispose() {
         title: const Text('Adjust Timeline', style: TextStyle(color: Colors.white)),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
+        child:  SingleChildScrollView(
+          child: audioInitializationError.isEmpty? Column(
             children: [   
-            const Divider(color: Colors.white24, thickness: 1),
+            const Divider(color: Colors.white24,  thickness: 1),
              Center(
               child: const Text('Fine-tune your audio clips',style: TextStyle(fontSize: 15, color:Colors.white),),
              ),
@@ -415,8 +550,6 @@ void dispose() {
                            _alignmentBar(isTablet),
                          ]
                        ),
-                    
-
                     //Slider for timeline scroll
                     Padding(
                       padding: EdgeInsets.only(left: _scrollbarLeft(isTablet), right: _listPadding),
@@ -497,7 +630,13 @@ void dispose() {
                           )],
                         ),
                         child: ElevatedButton(
-                          onPressed: () {},
+                          onPressed: () async{
+                            if(containArtist){
+                              final isAccepted=await showArtistVideoDialog(context);
+                              if(!isAccepted||!context.mounted) return;
+                            }
+                            
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.yellow,
                             foregroundColor: Colors.black,
@@ -516,6 +655,25 @@ void dispose() {
                 ),
               ),
             ],
+          ) 
+          : Container(
+            alignment: Alignment.center,
+            padding: EdgeInsets.only(top: 40),
+            child: Column(
+              spacing: 10,
+                children: [
+                  Text(audioInitializationError, style: TextStyle(fontSize: 15),),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      foregroundColor: Colors.black,
+                      backgroundColor: Colors.yellow
+                    ),
+                    onPressed: (){
+                    Navigator.pop(context);
+                  }, 
+                  child: Text("Back"))
+                ],
+              ),
           ),
         ),
       ),

@@ -38,7 +38,6 @@ class _HttpsVideoPlayer extends State<HttpsVideoPlayer>{
 
   // Extract the video URL from the API response.
   final jamFileLocation=widget.isSolo?'':'https://media05.fuzikapp.com/${result.videoDetail[0]['file_location'].toString()}';
-  print('Jam file location: $jamFileLocation');
   final url =widget.isSolo? result.videoDetail[0]['video_location'].toString(): jamFileLocation;
   _controller = VideoPlayerController.networkUrl(
     Uri.parse(url), httpHeaders: {'Referer':'https://fuzikapp.com'}

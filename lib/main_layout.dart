@@ -188,9 +188,9 @@ class _MainLayoutState extends State<MainLayout> {
             _selectedIndex = index;
           });
 
-          if (index == 0) {
-            _dashboardKey.currentState?.refreshDashboardData();
-          }
+          // if (index == 0) {
+          //   _dashboardKey.currentState?.refreshDashboardData();
+          // }
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
