@@ -11,6 +11,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:just_waveform/just_waveform.dart';
 import 'package:fuzik_mobile/services/fetch_videos.dart';
+import 'package:fuzik_mobile/wallet_api.dart';
 import 'dart:io';
 
 class AdjustTimelineScreen extends StatefulWidget {
@@ -46,6 +47,7 @@ class _AdjustTimelineScreenState extends State<AdjustTimelineScreen> {
   static const double _gapAfterBadge = 20;
   static const double _gapAfterThumb = 12;
   late List<bool> _volumeOpen;
+  late final String _collaborationQueueChargeRequestId = WalletApi.generateRequestId();
   String audioInitializationError='';
   double guideSeconds=1.0;
   double get _guideX=> guideSeconds*pixelsPerSecond;
@@ -416,6 +418,67 @@ Future<bool> showArtistVideoDialog(BuildContext context) async {
   return result ?? false;
 }
 
+Future<bool> showSendToQueueChargeDialog(BuildContext context) async {
+  final result = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) {
+      return AlertDialog(
+        backgroundColor: const Color(0xFF1C1C1C),
+        title: const Text(
+          'Send to Queue',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Sending this collaboration to the queue will deduct ${WalletApi.collaborationQueueFee} FZ Tokens from your wallet.',
+          style: const TextStyle(color: Colors.white70, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFFD600),
+              foregroundColor: Colors.black,
+            ),
+            child: const Text('Confirm'),
+          ),
+        ],
+      );
+    },
+  );
+
+  return result ?? false;
+}
+
+Future<void> _chargeCollaborationQueueFee(BuildContext context) async {
+  showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => const Center(
+      child: CircularProgressIndicator(color: Color(0xFFFFD600)),
+    ),
+  );
+
+  final charge = await WalletApi().chargeCollaborationQueueFee(
+    requestId: _collaborationQueueChargeRequestId,
+  );
+
+  if (!context.mounted) return;
+  Navigator.pop(context);
+
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    content: Text(
+      charge.success
+          ? 'Sent to queue. ${WalletApi.collaborationQueueFee} FZ Tokens deducted.'
+          : charge.error ?? 'Could not complete the charge.',
+    ),
+  ));
+}
+
 @override
   void initState(){
     super.initState();
@@ -634,8 +697,12 @@ void dispose() {
                             if(containArtist){
                               final isAccepted=await showArtistVideoDialog(context);
                               if(!isAccepted||!context.mounted) return;
+
+                              final isConfirmed=await showSendToQueueChargeDialog(context);
+                              if(!isConfirmed||!context.mounted) return;
+
+                              await _chargeCollaborationQueueFee(context);
                             }
-                            
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.yellow,

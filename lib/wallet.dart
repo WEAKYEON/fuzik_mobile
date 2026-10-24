@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 
 import 'paysolution.dart';
@@ -15,15 +18,26 @@ class _WalletState extends State<Wallet> {
 
   final WalletApi _api = WalletApi();
   late Future<List<CoinPack>> _future;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  bool _wasOffline = false;
 
   @override
   void initState() {
     super.initState();
     _future = _load();
+    _connectivitySubscription =
+        Connectivity().onConnectivityChanged.listen(_onConnectivityChanged);
+  }
+
+  void _onConnectivityChanged(List<ConnectivityResult> results) {
+    final isOffline = results.every((r) => r == ConnectivityResult.none);
+    if (_wasOffline && !isOffline) _refresh();
+    _wasOffline = isOffline;
   }
 
   @override
   void dispose() {
+    _connectivitySubscription?.cancel();
     _api.dispose();
     super.dispose();
   }

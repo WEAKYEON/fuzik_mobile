@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -19,25 +17,27 @@ class _PaySolutionState extends State<PaySolution> {
   static const Color _cardColor = Color(0xFF1B1B1B);
   static const Color _borderColor = Color(0xFF27272A);
 
-  late final String _referenceNumber;
+  String? _referenceNumber;
+  bool _loadingRefno = true;
   bool _submitting = false;
 
   @override
   void initState() {
     super.initState();
-    _referenceNumber = _generateRefno();
+    _loadRefno();
   }
 
-  static String _generateRefno() {
-    final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
-    final random = (100 + Random().nextInt(900)).toString();
-    final combined = '$timestamp$random';
-    final last12 = combined.substring(combined.length - 12);
-    return last12.padLeft(12, '0');
+  Future<void> _loadRefno() async {
+    final refno = await WalletApi().fetchRefno();
+    if (!mounted) return;
+    setState(() {
+      _referenceNumber = refno;
+      _loadingRefno = false;
+    });
   }
 
   Future<void> _submitPayment() async {
-    if (_submitting) return;
+    if (_submitting || _referenceNumber == null) return;
     final email = Supabase.instance.client.auth.currentUser?.email;
     if (email == null) return;
 
@@ -48,7 +48,7 @@ class _PaySolutionState extends State<PaySolution> {
       MaterialPageRoute(
         builder: (context) => PaySolutionCheckout(
           pack: widget.pack,
-          refno: _referenceNumber,
+          refno: _referenceNumber!,
           customerEmail: email,
         ),
       ),
@@ -84,7 +84,10 @@ class _PaySolutionState extends State<PaySolution> {
           padding: const EdgeInsets.symmetric(horizontal: 22),
           child: Column(
             children: [
-              _buildRow('Reference No.', _referenceNumber),
+              _buildRow(
+                'Reference No.',
+                _referenceNumber ?? (_loadingRefno ? '…' : '—'),
+              ),
               const Divider(color: _borderColor, height: 1),
               _buildRow('Product', widget.pack.name),
               const Divider(color: _borderColor, height: 1),
@@ -97,7 +100,7 @@ class _PaySolutionState extends State<PaySolution> {
         const SizedBox(height: 28),
         _buildPrimaryButton(
           _submitting ? 'Redirecting…' : 'Confirm Purchase',
-          _submitting ? null : _submitPayment,
+          _submitting || _referenceNumber == null ? null : _submitPayment,
         ),
         const SizedBox(height: 16),
         const Text(
