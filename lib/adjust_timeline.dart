@@ -471,7 +471,22 @@ void dispose() {
                               )],
                             ),
                             child: ElevatedButton(
-                              onPressed: () {},
+                              onPressed: () async{
+                                final previewUrl = await generatePreview(
+                                  layoutName: widget.layoutName,
+                                  clip1: "L" ,
+                                  clip2:"L" ,
+                                  clipsNum: '${widget.selectedVideos.length}',
+                                  video01File: widget.selectedVideos[0]['url'],
+                                  video02File: widget.selectedVideos[1]['url'],
+                                  bar01: audioDelays[0],
+                                  bar02: audioDelays[1],
+                                  audio01: players[0].volume,
+                                  audio02: players[1].volume,
+                                  startTime: 10,
+                                );
+                                print('Preview Url: $previewUrl');
+                              },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.yellow,
                                 foregroundColor: Colors.black,
@@ -522,6 +537,54 @@ void dispose() {
     );
   }
 
+Future<String> generatePreview({
+  required String layoutName,
+  required String clip1,
+  required String clip2,
+  required String clipsNum,
+  required String video01File,
+  required String video02File,
+  required double bar01,
+  required double bar02,
+  required double audio01,
+  required double audio02,
+  required double startTime,
+}) async {
+  final uri = Uri.https(
+    'media05.fuzikapp.com',
+    '/ajax_preview2.php',
+    {
+      'layout_name': layoutName,
+      'clip1': clip1,
+      'clip2': clip2,
+      'clips_num': clipsNum,
+      'video01_file': video01File,
+      'video02_file': video02File,
+      'bar01': bar01.toStringAsFixed(0),
+      'bar02': bar02.toStringAsFixed(0),
+      'audio01': audio01.toString(),
+      'audio02': audio02.toString(),
+      'start_time': startTime.toString()
+    },
+  );
+
+  final response = await http.get(uri);
+
+  if (response.statusCode != 200) {
+    throw Exception(
+      'Preview generation failed: HTTP ${response.statusCode}',
+    );
+  }
+
+  final result = response.body.trim();
+
+  if (result.isEmpty) {
+    throw Exception('The server returned an empty preview result.');
+  }
+
+  // The web version treats the response as a path or filename.
+  return 'https://media05.fuzikapp.com/$result';
+}
 //Tracks
 Widget _buildTrackTimeline(int index, {required bool isTablet}) {
     double secondsDelay = audioDelays[index];
