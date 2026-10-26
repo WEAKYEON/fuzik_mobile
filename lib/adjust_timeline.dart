@@ -483,7 +483,6 @@ void dispose() {
                                   bar02: audioDelays[1],
                                   audio01: players[0].volume,
                                   audio02: players[1].volume,
-                                  startTime: 10,
                                 );
                                 print('Preview Url: $previewUrl');
                               },
@@ -548,8 +547,18 @@ Future<String> generatePreview({
   required double bar02,
   required double audio01,
   required double audio02,
-  required double startTime,
+
 }) async {
+  final tempBar01 = (bar01.abs() * 1000).round();
+  final tempBar02 = (bar02.abs() * 1000).round();
+
+  final barMax = math.max(tempBar01, tempBar02);
+
+   bar01 = barMax - tempBar01.toDouble();
+   bar02 = barMax - tempBar02.toDouble();
+   final hasAudibleTrack = volumes[0] > 0 || volumes[1] > 0;
+  final startTime = hasAudibleTrack ? barMax / 10.0 : 0.0;
+
   final uri = Uri.https(
     'media05.fuzikapp.com',
     '/ajax_preview2.php',
@@ -564,7 +573,7 @@ Future<String> generatePreview({
       'bar02': bar02.toStringAsFixed(0),
       'audio01': audio01.toString(),
       'audio02': audio02.toString(),
-      'start_time': startTime.toString()
+      'start_time': startTime.round().toString()
     },
   );
 
