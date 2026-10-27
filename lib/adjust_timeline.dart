@@ -1,5 +1,5 @@
 import 'dart:async';
-
+import 'main_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:just_audio/just_audio.dart';
@@ -32,6 +32,7 @@ class _AdjustTimelineScreenState extends State<AdjustTimelineScreen> {
   final List<Color> trackColors = [const Color(0xFFFFFF12), Colors.yellow, Colors.yellow, Colors.yellow];
   late List<AudioPlayer> players;
   late List<Waveform?> waveforms;
+ List<String> videoDimensions=[];
   bool isMasterPlaying=false;
   double zoom = 1.0;
   double get pixelsPerSecond => 120.0 * zoom;
@@ -196,7 +197,9 @@ Future<void> _initializeAudio() async{
         final data= jsonDecode(response.body);
         
         final videoLocation=data[0]['video_location_120'];
-
+        final dimension=data[0]['dimension'];
+        videoDimensions.add(dimension);
+        print("Dimension: ${videoDimensions[i]}");
         //Get Audio File (Extracted audio)
         final audioFile = await getCachedAudio(
         videoCode,
@@ -454,7 +457,7 @@ Future<bool> showSendToQueueChargeDialog(BuildContext context) async {
   return result ?? false;
 }
 
-Future<void> _chargeCollaborationQueueFee(BuildContext context) async {
+Future<bool> _chargeCollaborationQueueFee(BuildContext context) async {
   showDialog<void>(
     context: context,
     barrierDismissible: false,
@@ -467,7 +470,7 @@ Future<void> _chargeCollaborationQueueFee(BuildContext context) async {
     requestId: _collaborationQueueChargeRequestId,
   );
 
-  if (!context.mounted) return;
+  if (!context.mounted) return false;
   Navigator.pop(context);
 
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -477,6 +480,7 @@ Future<void> _chargeCollaborationQueueFee(BuildContext context) async {
           : charge.error ?? 'Could not complete the charge.',
     ),
   ));
+  return charge.success;
 }
 
 @override
@@ -697,12 +701,43 @@ void dispose() {
                             if(containArtist){
                               final isAccepted=await showArtistVideoDialog(context);
                               if(!isAccepted||!context.mounted) return;
-
+                            }
                               final isConfirmed=await showSendToQueueChargeDialog(context);
                               if(!isConfirmed||!context.mounted) return;
 
-                              await _chargeCollaborationQueueFee(context);
-                            }
+                              final success= await _chargeCollaborationQueueFee(context);
+                              if(success){
+                                  final tempBar01 = (audioDelays[0].abs() * 1000).round();
+                                  final tempBar02 = (audioDelays[1].abs() * 1000).round();
+
+                                  final barMax = math.max(tempBar01, tempBar02);
+
+                                  final bar01 = barMax - tempBar01;
+                                  final bar02 = barMax - tempBar02;
+
+                                  try {
+                                    final result = await submitBatch2(
+                                      email: email, 
+                                      layoutCode: widget.layoutName,
+                                      clipsNum: widget.selectedVideos.length,
+
+                                      code01: widget.selectedVideos[0]['url'],
+                                      code02: widget.selectedVideos[1]['url'],
+
+                                      bar01: bar01,
+                                      bar02: bar02,
+
+                                      audio01: volumes[0],
+                                      audio02: volumes[1],
+                                      clip01: videoDimensions[0],
+                                      clip02: videoDimensions[1]
+                                    );
+
+                                    print('Batch submitted: $result');
+                                  } catch (e) {
+                                    print('Submit failed: $e');
+                                  }
+                                  }
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.yellow,
@@ -747,6 +782,77 @@ void dispose() {
     );
   }
 
+Future<Map<String, dynamic>> submitBatch2({
+  required String email,
+  required String layoutCode,
+  required int clipsNum,
+  required String code01,
+  required String code02,
+  required int bar01,
+  required int bar02,
+  required double audio01,
+  required double audio02,
+  String clip01 = 'L',
+  String clip02 = 'L',
+  String code03 = '-1',
+  String code04 = '-1',
+  String clip03 = '-1',
+  String clip04 = '-1',
+  int bar03 = -1,
+  int bar04 = -1,
+  double audio03 = -1,
+  double audio04 = -1,
+}) async {
+  final uri = Uri.https(
+    'engine01.fuzikapp.com',
+    '/submit_batch2',
+    {
+      'email': email,
+      'layout_code': layoutCode,
+      'clips_num': clipsNum.toString(),
+
+      'clip1': clip01,
+      'clip2': clip02,
+      'clip3': clip03,
+      'clip4': clip04,
+
+      'code01': code01,
+      'code02': code02,
+      'code03': code03,
+      'code04': code04,
+
+      'bar01': bar01.toString(),
+      'bar02': bar02.toString(),
+      'bar03': bar03.toString(),
+      'bar04': bar04.toString(),
+
+      'audio01': audio01.toString(),
+      'audio02': audio02.toString(),
+      'audio03': audio03.toString(),
+      'audio04': audio04.toString(),
+    },
+  );
+
+  final response = await http.get(uri);
+
+  print('Submit URL: $uri');
+  print('Status code: ${response.statusCode}');
+  print('Response: ${response.body}');
+
+  if (response.statusCode != 200) {
+    throw Exception(
+      'Failed to submit batch: HTTP ${response.statusCode}',
+    );
+  }
+
+  final result = jsonDecode(response.body) as Map<String, dynamic>;
+
+  if (result['result'] != 'Success') {
+    throw Exception('Backend failed to submit the batch.');
+  }
+
+  return result;
+}
 //Tracks
 Widget _buildTrackTimeline(int index, {required bool isTablet}) {
     double secondsDelay = audioDelays[index];

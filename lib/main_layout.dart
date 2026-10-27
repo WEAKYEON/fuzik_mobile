@@ -11,11 +11,11 @@ import 'wallet_api.dart';
 import 'login_screen.dart';
 import 'edit_profile.dart';
 import 'change_password.dart';
-import 'wallet.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:cached_network_image/cached_network_image.dart';
 
+String email='';
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
 
@@ -29,7 +29,6 @@ class _MainLayoutState extends State<MainLayout> {
   int _selectedIndex = 0;
   String _displayName = 'User';
   String _profilePic = '';
-
   final WalletApi _walletApi = WalletApi();
   Timer? _balanceTimer;
 
@@ -40,6 +39,7 @@ class _MainLayoutState extends State<MainLayout> {
     print('Current user: $user'); // Debugging line to check the current user
     if (user != null && user.email != null) {
       print(user);
+      email=user.email!;
       _displayName = user.email!.split('@')[0].isNotEmpty 
           ? user.email!.split('@')[0] 
           : 'User';

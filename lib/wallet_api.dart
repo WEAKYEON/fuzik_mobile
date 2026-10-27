@@ -191,7 +191,7 @@ class WalletApi {
     }
 
     try {
-      final uri = Uri.parse('$_engineUrl/debit_fz_collaboration_queue');
+      final uri = Uri.parse('$_engineUrl/submit_collaboration_token');
       final res = await _client
           .post(
             uri,

@@ -67,8 +67,11 @@ List<SlotOrientation> getOrientationList(String layoutname){
   if(layoutname=='3_04'){
     result=[SlotOrientation.portrait,SlotOrientation.landscape,SlotOrientation.landscape];
   }
-  if(layoutname=='2_06'||layoutname=='2_07'){
+  if(layoutname=='2_06'){
     result=[SlotOrientation.portrait,SlotOrientation.landscape];
+  }
+  if(layoutname=='2_07'){
+    result=[SlotOrientation.landscape,SlotOrientation.portrait];
   }
   if(layoutname=='2_08'){
     result=[SlotOrientation.portrait,SlotOrientation.portrait];
