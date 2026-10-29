@@ -12,7 +12,8 @@ import 'dart:math' as math;
 import 'package:just_waveform/just_waveform.dart';
 import 'package:fuzik_mobile/services/fetch_videos.dart';
 import 'package:fuzik_mobile/wallet_api.dart';
-import 'dart:io';
+import 'web_video_player.dart';
+import 'httpsVideoPlayer.dart';
 
 class AdjustTimelineScreen extends StatefulWidget {
   final String layoutName;
@@ -32,8 +33,13 @@ class _AdjustTimelineScreenState extends State<AdjustTimelineScreen> {
   final List<Color> trackColors = [const Color(0xFFFFFF12), Colors.yellow, Colors.yellow, Colors.yellow];
   late List<AudioPlayer> players;
   late List<Waveform?> waveforms;
- List<String> videoDimensions=[];
+  List<String> videoDimensions=[];
+  List<String> videoLocations=[];
   bool isMasterPlaying=false;
+  bool isPreviewReady=false;
+  bool isPreviewLoading=false;
+  String previewGeneratingError='Preview will be shown here.';
+  String previewVideoUrl='';
   double zoom = 1.0;
   double get pixelsPerSecond => 120.0 * zoom;
   late List<double> audioDelays;
@@ -197,9 +203,11 @@ Future<void> _initializeAudio() async{
         final data= jsonDecode(response.body);
         
         final videoLocation=data[0]['video_location_120'];
+        const prefix = 'https://media05.fuzikapp.com/stream/video_stream.php?code=';
+        final videoCodeFromPlay2Watch = data[0]['video_location'].replaceFirst(prefix, '');
         final dimension=data[0]['dimension'];
         videoDimensions.add(dimension);
-        print("Dimension: ${videoDimensions[i]}");
+        videoLocations.add(videoCodeFromPlay2Watch);
         //Get Audio File (Extracted audio)
         final audioFile = await getCachedAudio(
         videoCode,
@@ -639,7 +647,7 @@ void dispose() {
                   children: [
                     // ปุ่ม Generate Preview
                     Container(
-                      height: isTablet?225:117,
+                      height: isTablet?400:117,
                       width: isTablet?400:208,
                       decoration: BoxDecoration(
                         border: Border.all(color: Colors.yellow),
@@ -649,10 +657,15 @@ void dispose() {
                       alignment: Alignment.center,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.music_video,size: 45,),
-                          const SizedBox(height: 20,),
-                          const Text('Preview will be shown here', style: TextStyle(color: Colors.white54)),
+                        children: [       
+                          isPreviewReady? 
+                            SizedBox(
+                              width: 300,
+                              height: 200,
+                              child: WebVideoPlayer(videoUrl:previewVideoUrl ),
+                            )
+                            //HttpsVideoPlayer(isPreviewVideo: true,previewVideoUrl: previewVideoUrl,)
+                           :Text(previewGeneratingError, style: TextStyle(color: Colors.white54)),
                         ],
                       ),
                     ),
@@ -670,31 +683,68 @@ void dispose() {
                                 spreadRadius: 2
                               )],
                             ),
-                            child: ElevatedButton(
-                              onPressed: () async{
-                                final previewUrl = await generatePreview(
-                                  layoutName: widget.layoutName,
-                                  clip1: "L" ,
-                                  clip2:"L" ,
-                                  clipsNum: '${widget.selectedVideos.length}',
-                                  video01File: widget.selectedVideos[0]['url'],
-                                  video02File: widget.selectedVideos[1]['url'],
-                                  bar01: audioDelays[0],
-                                  bar02: audioDelays[1],
-                                  audio01: players[0].volume,
-                                  audio02: players[1].volume,
-                                );
-                                print('Preview Url: $previewUrl');
-                              },
+                           child: ElevatedButton(
+                              onPressed: isPreviewLoading
+                                  ? null
+                                  : () async {
+                                      setState(() {
+                                        isPreviewLoading = true;
+                                        previewGeneratingError = 'Loading';
+                                      });
+
+                                      try {
+                                        final resultUrl = await generatePreview(
+                                          layoutName: widget.layoutName,
+                                          clip1: videoDimensions[0],
+                                          clip2: videoDimensions[1],
+                                          clipsNum: '${widget.selectedVideos.length}',
+                                          video01File: videoLocations[0],
+                                          video02File: videoLocations[1],
+                                          bar01: audioDelays[0],
+                                          bar02: audioDelays[1],
+                                          audio01: players[0].volume,
+                                          audio02: players[1].volume,
+                                        );
+
+                                        print('Preview url: $resultUrl');
+
+                                        if (!mounted) return;
+
+                                        setState(() {
+                                          isPreviewReady = true;
+                                          previewVideoUrl = resultUrl;
+                                        });
+                                      } catch (e) {
+                                        if (!mounted) return;
+
+                                        setState(() {
+                                          isPreviewReady = false;
+                                          previewGeneratingError =
+                                              'Preview Generating Error: $e';
+                                        });
+                                      } finally {
+                                        if (mounted) {
+                                          setState(() {
+                                            isPreviewLoading = false;
+                                          });
+                                        }
+                                      }
+                                    },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.yellow,
                                 foregroundColor: Colors.black,
+                                disabledBackgroundColor: const Color.fromARGB(255, 59, 59, 59),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15)
+                                  borderRadius: BorderRadius.circular(15),
                                 ),
-                                textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                                textStyle: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                              child: Text('Generate 20s Preview',style: TextStyle(fontSize: isTablet?17:9),),
+                              child: Text(
+                                isPreviewLoading ? 'Generating Preview...' : 'Generate 20s Preview',
+                                style: TextStyle(fontSize: isTablet ? 17 : 9),
+                              ),
                             ),
                           ),
                         ),
@@ -718,17 +768,21 @@ void dispose() {
                             }
                               final isConfirmed=await showSendToQueueChargeDialog(context);
                               if(!isConfirmed||!context.mounted) return;
-
-                              final success= await _chargeCollaborationQueueFee(context);
-                              if(success){
+                              
                                   final tempBar01 = (audioDelays[0].abs() * 1000).round();
                                   final tempBar02 = (audioDelays[1].abs() * 1000).round();
+                                  final tempBar03 =widget.selectedVideos.length>2? (audioDelays[2].abs()*1000).round():0;
+                                  final tempBar04 =widget.selectedVideos.length>3? (audioDelays[3].abs()*1000).round():0;
 
-                                  final barMax = math.max(tempBar01, tempBar02);
+                                  final max0102=math.max(tempBar01, tempBar02);
+                                  final max0304=math.max(tempBar03, tempBar04);
+                                  final barMax = math.max(max0102, max0304);
 
                                   final bar01 = barMax - tempBar01;
                                   final bar02 = barMax - tempBar02;
-
+                                  final bar03 = barMax - tempBar02;
+                                  final bar04 = barMax - tempBar02;
+                                 
                                   try {
                                     final result = await submitBatch2(
                                       email: email, 
@@ -737,22 +791,32 @@ void dispose() {
 
                                       code01: widget.selectedVideos[0]['url'],
                                       code02: widget.selectedVideos[1]['url'],
+                                      code03:widget.selectedVideos.length>2?widget.selectedVideos[2]['url']:"-1",
+                                      code04:widget.selectedVideos.length>3?widget.selectedVideos[3]['url']:"-1",
 
                                       bar01: bar01,
                                       bar02: bar02,
+                                      bar03:widget.selectedVideos.length>2?bar03:-1,
+                                      bar04:widget.selectedVideos.length>3?bar04:-1,
 
                                       audio01: volumes[0],
                                       audio02: volumes[1],
+                                      audio03: widget.selectedVideos.length>2?volumes[2]:-1,
+                                      audio04: widget.selectedVideos.length>3?volumes[3]:-1,
+
                                       clip01: videoDimensions[0],
-                                      clip02: videoDimensions[1]
+                                      clip02: videoDimensions[1],
+                                      clip03: widget.selectedVideos.length>2?videoDimensions[2]:'-1',
+                                      clip04: widget.selectedVideos.length>3?videoDimensions[3]:'-1',
                                     );
 
                                     print('Batch submitted: $result');
                                   } catch (e) {
                                     print('Submit failed: $e');
                                   }
-                                  }
-                          },
+                                  if(!context.mounted)return;
+                                  await _chargeCollaborationQueueFee(context);
+                                },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.yellow,
                             foregroundColor: Colors.black,

@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'jam_watch.dart';
@@ -11,7 +10,9 @@ class HttpsVideoPlayer extends StatefulWidget {
   final bool isSolo;
   final String previewUrl;
   final Video videoDetail;
-  const HttpsVideoPlayer({super.key,required this.videoUrl, this.isSolo=true, this.previewUrl='',  this.videoDetail=const Video()});
+  final bool isPreviewVideo;
+  final String previewVideoUrl;
+  const HttpsVideoPlayer({super.key,this.videoUrl="", this.isSolo=true, this.previewUrl='',  this.videoDetail=const Video(), this.isPreviewVideo=false, this.previewVideoUrl=""});
 
   @override
   State<HttpsVideoPlayer> createState()=>_HttpsVideoPlayer();
@@ -24,7 +25,12 @@ class _HttpsVideoPlayer extends State<HttpsVideoPlayer>{
   bool isLoading = true;
   
   Future<void> initializeVideo() async {
-  final result = widget.isSolo? await getVideoDetail(isSolo: widget.isSolo,videoUrl: widget.videoUrl): widget.videoDetail;
+    String url='';
+  if(widget.isPreviewVideo){
+    url=widget.previewVideoUrl;
+  }
+  else{
+    final result = widget.isSolo? await getVideoDetail(isSolo: widget.isSolo,videoUrl: widget.videoUrl): widget.videoDetail;
 
   if (!mounted) return;
 
@@ -38,7 +44,8 @@ class _HttpsVideoPlayer extends State<HttpsVideoPlayer>{
 
   // Extract the video URL from the API response.
   final jamFileLocation=widget.isSolo?'':'https://media05.fuzikapp.com/${result.videoDetail[0]['file_location'].toString()}';
-  final url =widget.isSolo? result.videoDetail[0]['video_location'].toString(): jamFileLocation;
+  url =widget.isSolo? result.videoDetail[0]['video_location'].toString(): jamFileLocation;
+  }
   _controller = VideoPlayerController.networkUrl(
     Uri.parse(url), httpHeaders: {'Referer':'https://fuzikapp.com'}
   );
@@ -93,7 +100,7 @@ Widget build(BuildContext context) {
     );
   }
 
-  if (_controller == null || !_controller.value.isInitialized) {
+  if (!_controller.value.isInitialized) {
     return const SizedBox.shrink();
   }
   
@@ -105,7 +112,7 @@ Widget build(BuildContext context) {
                 valueListenable: _controller,
                 builder: (context, value, child) {
                   // Show the poster until the video position moves past zero
-                  final showPoster = value.position == Duration.zero && !widget.isSolo;
+                  final showPoster = value.position == Duration.zero && !widget.isSolo && !widget.isPreviewVideo;
                   return Stack(
                     fit: StackFit.expand,
                     children: [
