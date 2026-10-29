@@ -83,6 +83,12 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
 
     final youtubeValue = value.trim();
 
+    if (youtubeValue.toLowerCase() == 'null' ||
+        youtubeValue.toLowerCase() == 'none' ||
+        youtubeValue.toLowerCase() == 'false') {
+      return '';
+    }
+
     if (youtubeValue.startsWith('http://') ||
         youtubeValue.startsWith('https://')) {
       return youtubeValue;

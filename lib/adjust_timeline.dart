@@ -45,7 +45,7 @@ class _AdjustTimelineScreenState extends State<AdjustTimelineScreen> {
   double guideSeconds=1.0;
   double get _guideX=> guideSeconds*pixelsPerSecond;
   bool get _anythingActive =>players.any((p) => p.playing) || _waiting.any((w) => w);
-  double _thumbWidth(bool isTablet) => isTablet ? 200 : 100;
+  double _thumbWidth(bool isTablet) => isTablet ? 200 : 125;
 
   double _scrollbarLeft(bool isTablet) =>
       _listPadding + _badgeColumnWidth + _gapAfterBadge +
@@ -318,7 +318,84 @@ void dispose() {
 }
   @override
   Widget build(BuildContext context) {
-  final isTablet= MediaQuery.of(context).size.shortestSide >= 600;
+    final mediaQuery = MediaQuery.of(context);
+
+    final isTablet =
+        mediaQuery.size.shortestSide >= 600;
+
+    final isPhonePortrait =
+        !isTablet &&
+            mediaQuery.orientation == Orientation.portrait;
+
+    // Phone only to Ask the user to rotate the device
+    if (isPhonePortrait) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: const BackButton(
+            color: Colors.yellow,
+          ),
+          title: const Text(
+            'Adjust Timeline',
+            style: TextStyle(
+              color: Colors.white,
+            ),
+          ),
+        ),
+        body: Center(
+          child: Dialog(
+            backgroundColor: const Color(0xFF242424),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 28,
+                vertical: 32,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.screen_rotation_rounded,
+                    color: Color(0xFFFFD600),
+                    size: 56,
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  const Text(
+                    'Rotate Your Device',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  Text(
+                    'For a better editing experience, please rotate your phone to landscape mode.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 14,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // if Tablet or phone ia landscape, keep the existing Adjust Timeline UI(max's ipad).
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -332,10 +409,11 @@ void dispose() {
           child: Column(
             children: [   
             const Divider(color: Colors.white24, thickness: 1),
-             Center(
-              child: const Text('Fine-tune your audio clips',style: TextStyle(fontSize: 15, color:Colors.white),),
+            SizedBox(height: isTablet ? 20 : 15,),
+            const Center(
+              child: Text('Fine-tune your audio clips',style: TextStyle(fontSize: 15, color:Colors.white),),
              ),
-             const SizedBox(height: 20,),
+             SizedBox(height: isTablet ? 20: 15,),
              SizedBox(
               width: double.infinity,
               height: 70,
@@ -439,8 +517,8 @@ void dispose() {
                   children: [
                     // ปุ่ม Generate Preview
                     Container(
-                      height: isTablet?225:117,
-                      width: isTablet?400:208,
+                      height: isTablet?225:165,
+                      width: isTablet?400:290,
                       decoration: BoxDecoration(
                         border: Border.all(color: Colors.yellow),
                         borderRadius: BorderRadius.circular(5),
@@ -460,7 +538,8 @@ void dispose() {
                     Column(
                       children: [
                         SizedBox(
-                          width: 300,
+                          width: isTablet ? 300 : 190,
+                          height: isTablet ? null : 38,
                           child: Container(         
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(17),
@@ -480,13 +559,16 @@ void dispose() {
                                 ),
                                 textStyle: const TextStyle(fontWeight: FontWeight.bold),
                               ),
-                              child: Text('Generate 20s Preview',style: TextStyle(fontSize: isTablet?17:9),),
+                              child: Text('Generate 20s Preview',style: TextStyle(fontSize: isTablet?17:12),),
                             ),
                           ),
                         ),
-                      const SizedBox(height: 30,),
                       SizedBox(
-                      width: isTablet?300:200,
+                        height: isTablet? 30 : 18,
+                      ),
+                      SizedBox(
+                      width: isTablet?300:170,
+                      height: isTablet ? null : 38,
                       child: Container(       
                         decoration: BoxDecoration(                 
                           borderRadius: BorderRadius.circular(17),
@@ -506,7 +588,7 @@ void dispose() {
                             ),
                             textStyle: const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          child: Text('Send To Queue',style: TextStyle(fontSize: isTablet?17:9),),
+                          child: Text('Send To Queue',style: TextStyle(fontSize: isTablet?17:12),),
                         ),
                       ),
                     ),
@@ -578,8 +660,8 @@ Widget _buildTrackTimeline(int index, {required bool isTablet}) {
               SizedBox(width: 20,),
               Container(
                 padding: const EdgeInsets.fromLTRB(5, 5, 5, 0),
-                width: isTablet?200:100,
-                height: isTablet?150:100,
+                width: _thumbWidth(isTablet),
+                height: isTablet ? 150 : 110,
                 decoration: BoxDecoration(
                   color: Colors.grey[850],
                   borderRadius: BorderRadius.circular(8),
@@ -591,8 +673,8 @@ Widget _buildTrackTimeline(int index, {required bool isTablet}) {
                     Column(
                       children: [
                         Container(
-                          width: 180,
-                          height: 95,
+                          width: double.infinity,
+                          height: isTablet ? 95 : 65,
                           clipBehavior: Clip.antiAliasWithSaveLayer,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(6),
@@ -606,40 +688,76 @@ Widget _buildTrackTimeline(int index, {required bool isTablet}) {
                           ),
                         ),
                         SizedBox(
-                          width: double.infinity,          
+                          width: double.infinity,
+                          height: 36,
                           child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
                               StreamBuilder<PlayerState>(
                                 stream: players[index].playerStateStream,
                                 builder: (context, snapshot) {
                                   final playerState = snapshot.data;
-                                  final isPlaying = (playerState?.playing ?? false) && playerState?.processingState!=ProcessingState.completed;
-                                  return IconButton(
+
+                                  final isPlaying =
+                                      (playerState?.playing ?? false) &&
+                                          playerState?.processingState !=
+                                              ProcessingState.completed;
+
+                                  return SizedBox(
+                                    width: 30,
+                                    height: 30,
+                                    child: IconButton(
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      iconSize: isTablet ? 25 : 18,
                                       icon: Icon(
-                                        isPlaying ? Icons.pause : Icons.play_arrow,
+                                        isPlaying
+                                            ? Icons.pause
+                                            : Icons.play_arrow,
                                         color: Colors.white,
-                                        size: 25,
                                       ),
-                                      onPressed: () => togglePlay(index,secondsDelay),
-                                    );
-                                }
-                              ),
-                              
-                              IconButton(
-                                icon: const Icon(Icons.skip_previous, color: Colors.white, size: 30),
-                                onPressed: () => startOver(index),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.replay, color: Colors.white, size: 25),
-                                onPressed: () {
-                                  setState(() {
-                                    audioDelays[index] = 0.0;
-                                  });
+                                      onPressed: () =>
+                                          togglePlay(index, secondsDelay),
+                                    ),
+                                  );
                                 },
                               ),
-                            ],),
+
+                              SizedBox(
+                                width: 30,
+                                height: 30,
+                                child: IconButton(
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  iconSize: isTablet ? 30 : 20,
+                                  icon: const Icon(
+                                    Icons.skip_previous,
+                                    color: Colors.white,
+                                  ),
+                                  onPressed: () => startOver(index),
+                                ),
+                              ),
+
+                              SizedBox(
+                                width: 30,
+                                height: 30,
+                                child: IconButton(
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  iconSize: isTablet ? 25 : 18,
+                                  icon: const Icon(
+                                    Icons.replay,
+                                    color: Colors.white,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      audioDelays[index] = 0.0;
+                                    });
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
                         )
                       ],
                     ),
@@ -678,7 +796,7 @@ Widget _buildTrackTimeline(int index, {required bool isTablet}) {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [                                
                         Container(
-                          height: 150,
+                          height: isTablet ? 150 : 110,
                           width: double.infinity,
                           decoration: BoxDecoration(
                             color: Colors.white,
@@ -707,8 +825,13 @@ Widget _buildTrackTimeline(int index, {required bool isTablet}) {
                         ),
                         Positioned(
                           left: visibleWaveformLeft,
-                          top: (150 - 80) / 2,
-                          child: BarWaves(index)
+                          top: isTablet
+                              ? (150 - 80) / 2
+                              : (110 - 60) / 2,
+                          child: BarWaves(
+                              index,
+                              isTablet: isTablet,
+                          )
                         ),
                         Positioned(
                           top:10,
@@ -834,7 +957,7 @@ Widget _alignmentBar(bool isTablet) {
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
-                '${guideSeconds.toStringAsFixed(2)}',
+                guideSeconds.toStringAsFixed(2),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 10,
@@ -848,7 +971,10 @@ Widget _alignmentBar(bool isTablet) {
   );
 }
   //Waves
-Widget BarWaves(int index){
+  Widget BarWaves(
+      int index, {
+        required bool isTablet,
+      }) {
     final waveform = waveforms[index];
     if(waveform==null){
       return const SizedBox(
@@ -863,9 +989,9 @@ Widget BarWaves(int index){
     }
     final duration = players[index].duration;
     if(duration==null){
-      return const SizedBox(
+      return SizedBox(
       width: 300,
-      height: 80,);}
+      height: isTablet ? 80 : 60, );}
     final waveformWidth= duration.inMilliseconds/1000 *pixelsPerSecond;
     return SizedBox(
       width: waveformWidth,

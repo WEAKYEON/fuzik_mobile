@@ -786,7 +786,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   onTap: () async {
                     final messenger =
                     ScaffoldMessenger.of(
-                      this.context,
+                      context,
                     );
 
                     Navigator.pop(
@@ -1071,7 +1071,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       _displayNameController,
                       'Display Name',
                       readOnly: true,
+                      helperText: 'Display Name cannot be changed.',
                     ),
+
 
                     const SizedBox(
                       height: 16,
@@ -1253,6 +1255,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         List<TextInputFormatter>?
         inputFormatters,
         bool readOnly = false,
+        String? helperText,
       }) {
     return TextField(
       controller: controller,
@@ -1282,6 +1285,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       decoration:
       InputDecoration(
+        helperText: helperText,
+
+        helperStyle: const TextStyle(
+          color: Colors.black54,
+          fontSize: 12,
+        ),
+
         hintText: hint,
 
         hintStyle:
@@ -1292,10 +1302,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
         filled: true,
 
-        fillColor:
-        const Color(
-          0xFFF4F7FC,
-        ),
+        fillColor: readOnly
+            ? const Color(0xFFE8E8E8)
+            : const Color(0xFFF4F7FC),
 
         border:
         OutlineInputBorder(
