@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'paysolution_success.dart';
 import 'paysolution_webview.dart';
 import 'wallet_api.dart';
 
@@ -43,7 +44,25 @@ class _PaySolutionState extends State<PaySolution> {
 
     setState(() => _submitting = true);
     if (!mounted) return;
-    await Navigator.push(
+
+    final deposited = await WalletApi().recordDeposit(
+      refno: _referenceNumber!,
+      amount: widget.pack.price,
+    );
+    if (!mounted) return;
+    if (!deposited) {
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not start the payment. Please try again.'),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final completed = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (context) => PaySolutionCheckout(
@@ -53,7 +72,18 @@ class _PaySolutionState extends State<PaySolution> {
         ),
       ),
     );
-    if (mounted) setState(() => _submitting = false);
+    if (!mounted) return;
+    setState(() => _submitting = false);
+
+    if (completed == true) {
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const PaySolutionSuccess(),
+        ),
+      );
+    }
   }
 
   @override

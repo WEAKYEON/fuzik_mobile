@@ -54,7 +54,6 @@ class _AdjustTimelineScreenState extends State<AdjustTimelineScreen> {
   static const double _gapAfterBadge = 20;
   static const double _gapAfterThumb = 12;
   late List<bool> _volumeOpen;
-  late final String _collaborationQueueChargeRequestId = WalletApi.generateRequestId();
   String audioInitializationError='';
   double guideSeconds=1.0;
   double get _guideX=> guideSeconds*pixelsPerSecond;
@@ -474,9 +473,7 @@ Future<bool> _chargeCollaborationQueueFee(BuildContext context) async {
     ),
   );
 
-  final charge = await WalletApi().chargeCollaborationQueueFee(
-    requestId: _collaborationQueueChargeRequestId,
-  );
+  final charge = await WalletApi().chargeCollaborationQueueFee();
 
   if (!context.mounted) return false;
   Navigator.pop(context);

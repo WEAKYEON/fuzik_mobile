@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -46,12 +45,10 @@ class WalletSummary {
 
 class CollaborationQueueCharge {
   final bool success;
-  final bool alreadyCharged;
   final String? error;
 
   const CollaborationQueueCharge({
     required this.success,
-    this.alreadyCharged = false,
     this.error,
   });
 }
@@ -64,6 +61,8 @@ class WalletApi {
   static const Duration _timeout = Duration(seconds: 20);
   static const int freeCap = 200;
   static const int collaborationQueueFee = 120;
+  static const String _depositEmail = 'omiesensei@gmail.com';
+  static const String _activitiesEmail = 'ohm@tetrasolution.com';
 
   static const List<CoinPack> defaultPacks = [
     CoinPack(code: 'test', name: 'Test Pack', coinsLabel: '1 Coins', price: 2),
@@ -87,27 +86,14 @@ class WalletApi {
       (dotenv.env['ENGINE_URL'] ?? 'https://engine01.fuzikapp.com')
           .replaceAll(RegExp(r'/+$'), '');
 
-  String get _tokenUrl =>
-      (dotenv.env['TOKEN_URL'] ?? 'https://tetrasolution.com/token_app/api')
-          .replaceAll(RegExp(r'/+$'), '');
-
   String get _realmFree => dotenv.env['REALM_FREE'] ?? 'REALM00000002';
 
   String get _realmPaid => dotenv.env['REALM_PAID'] ?? 'REALM00000001';
 
   String? get currentEmail => Supabase.instance.client.auth.currentUser?.email;
 
-  String? get _accessToken =>
-      Supabase.instance.client.auth.currentSession?.accessToken;
-
-  static String generateRequestId() {
-    final random = Random.secure();
-    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
-    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-  }
-
   Future<int?> _tokenBalance(String realmId, String email) async {
-    final uri = Uri.parse('$_tokenUrl/check_balance_by_email.php').replace(
+    final uri = Uri.parse('$_engineUrl/check_balance').replace(
       queryParameters: {
         'q': 'a',
         'realm_id': realmId,
@@ -118,7 +104,7 @@ class WalletApi {
     if (res.statusCode != 200) return null;
     final body = json.decode(res.body);
     if (body is Map && body['balance'] != null) {
-      final raw = body['balance'].toString();
+      final raw = body['balance'].toString().split(' ').first;
       return int.tryParse(raw) ?? double.tryParse(raw)?.toInt();
     }
     return null;
@@ -160,6 +146,48 @@ class WalletApi {
     }
   }
 
+  Future<bool> recordDeposit({
+    required String refno,
+    required num amount,
+  }) async {
+    final email = currentEmail;
+    if (email == null || email.isEmpty) return false;
+
+    try {
+      final uri = Uri.parse('$_engineUrl/transfer').replace(
+        queryParameters: {
+          'from_email': email,
+          'to_email': _depositEmail,
+          'amount': '$amount',
+          'remark': 'Deposit-$refno',
+          'realm_id': _realmPaid,
+          'void': '1',
+        },
+      );
+      final res = await _client.get(uri).timeout(_timeout);
+      if (res.statusCode != 200) return false;
+      final body = json.decode(res.body);
+      return body is Map && body['result'] == 'Success';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> confirmDeposits() async {
+    try {
+      final uri = Uri.parse('$_engineUrl/confirm_all');
+      final res = await _client.get(uri).timeout(_timeout);
+      if (res.statusCode != 200) return false;
+      final body = json.decode(res.body);
+      return body is List &&
+          body.isNotEmpty &&
+          body[0] is Map &&
+          body[0]['result'] == 'Success';
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<List<CoinPack>> fetchPacks() async {
     try {
       final uri = Uri.parse(
@@ -179,11 +207,9 @@ class WalletApi {
     return defaultPacks;
   }
 
-  Future<CollaborationQueueCharge> chargeCollaborationQueueFee({
-    required String requestId,
-  }) async {
-    final token = _accessToken;
-    if (token == null || token.isEmpty) {
+  Future<CollaborationQueueCharge> chargeCollaborationQueueFee() async {
+    final email = currentEmail;
+    if (email == null || email.isEmpty) {
       return const CollaborationQueueCharge(
         success: false,
         error: 'You need to be signed in to send a collaboration to the queue.',
@@ -191,26 +217,23 @@ class WalletApi {
     }
 
     try {
-      final uri = Uri.parse('$_engineUrl/submit_collaboration_token');
-      final res = await _client
-          .post(
-            uri,
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-            body: json.encode({'request_id': requestId}),
-          )
-          .timeout(_timeout);
+      final uri = Uri.parse('$_engineUrl/transfer').replace(
+        queryParameters: {
+          'from_email': email,
+          'to_email': _activitiesEmail,
+          'amount': '$collaborationQueueFee',
+          'remark': 'Purchase',
+          'realm_id': _realmFree,
+          'void': '0',
+        },
+      );
+      final res = await _client.get(uri).timeout(_timeout);
       final body = json.decode(res.body);
       if (body is Map && body['result'] == 'Success') {
         unawaited(fetchSummary());
-        return CollaborationQueueCharge(
-          success: true,
-          alreadyCharged: body['already_charged'] == true,
-        );
+        return const CollaborationQueueCharge(success: true);
       }
-      final error = body is Map ? body['error']?.toString() : null;
+      final error = body is Map ? body['remark']?.toString() : null;
       return CollaborationQueueCharge(
         success: false,
         error: error ?? 'Could not complete the charge.',

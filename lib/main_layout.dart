@@ -142,12 +142,12 @@ class _MainLayoutState extends State<MainLayout> {
                 children: [
                   _buildStatusBadge(
                     'PR ${pr ?? '—'}/∞',
-                    const Color(0xFF8AB4F8),
+                    const Color(0xFFFFD600),
                   ),
                   const SizedBox(width: 8),
                   _buildStatusBadge(
                     'FZ ${fz ?? '—'}/200',
-                    const Color(0xFFFFD600),
+                    const Color(0xFF8AB4F8),
                   ),
                 ],
               );
