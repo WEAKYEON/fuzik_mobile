@@ -286,6 +286,19 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
           isLoading = false;
         });
 
+        if (!widget.isCollaboration) {
+          final musicianEmail =
+              fallback['musician_email']
+                  ?.toString() ??
+                  '';
+
+          if (musicianEmail.isNotEmpty) {
+            await _loadMusicianProfile(
+              musicianEmail,
+            );
+          }
+        }
+
         if (!widget.isCollaboration &&
             widget.autoEdit &&
             mounted) {

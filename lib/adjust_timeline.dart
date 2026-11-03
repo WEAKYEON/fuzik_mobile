@@ -37,7 +37,7 @@ class _AdjustTimelineScreenState extends State<AdjustTimelineScreen> {
   double timelineScroll=0.0;
   double _viewportWidth=300;
   late List<int> wavePeaks;
-  static const double _badgeColumnWidth = 44;
+  double _badgeColumnWidth(bool isTablet) => isTablet ? 44 : 52;
   static const double _listPadding = 16; // the ListView's padding
   static const double _gapAfterBadge = 20;
   static const double _gapAfterThumb = 12;
@@ -48,7 +48,7 @@ class _AdjustTimelineScreenState extends State<AdjustTimelineScreen> {
   double _thumbWidth(bool isTablet) => isTablet ? 200 : 125;
 
   double _scrollbarLeft(bool isTablet) =>
-      _listPadding + _badgeColumnWidth + _gapAfterBadge +
+      _listPadding + _badgeColumnWidth(isTablet) + _gapAfterBadge +
       _thumbWidth(isTablet) + _gapAfterThumb;
 
 int computePeak(Waveform w) {
@@ -622,7 +622,7 @@ Widget _buildTrackTimeline(int index, {required bool isTablet}) {
           Row(
             children: [
               SizedBox(
-                width: _badgeColumnWidth,
+                width: _badgeColumnWidth(isTablet),
                 child: Column(
                   children: [
                     Container(

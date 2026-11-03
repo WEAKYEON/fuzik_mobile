@@ -246,16 +246,26 @@ class _JamWatchScreenState extends State<JamWatchScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.black,
         elevation: 0,
-        leading: const BackButton(color: Colors.white),
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.yellow,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 20,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             buildPlayer(),
+
             const SizedBox(height: 20),
 
             if (title.isNotEmpty)
@@ -263,134 +273,191 @@ class _JamWatchScreenState extends State<JamWatchScreen> {
                 title,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 18,
+                  fontSize: 22,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-            const SizedBox(height: 16),
+
+            const SizedBox(height: 8),
 
             if (ready) ...[
-              _buildOwnerRow(),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
+              //user
+              Row(
                 children: [
-                  _buildPillButton(
-                    _isFan ? Icons.person : Icons.person_add,
-                    'Fan',
-                    _isFan ? Colors.red : const Color(0xFFFFB300),
-                    _toggleFan,
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(25),
+                    child: ownerPic.isNotEmpty
+                      ? CachedNetworkImage(
+                        imageUrl: '$_mediaBase/$ownerPic',
+                        httpHeaders: _headers,
+                        width: 40,
+                        height: 40,
+                        fit: BoxFit.cover,
+                        errorWidget: (context, url, error) {
+                          return const Icon(
+                            Icons.person,
+                            color: Colors.white,
+                          );
+                        },
+                      )
+                      :const Icon(
+                        Icons.person,
+                        color: Colors.white,
+                      ),
                   ),
-                  _buildPillButton(
-                    _isLiked ? Icons.favorite : Icons.favorite_border,
-                    _isLiked ? 'Liked' : 'Like',
-                    _isLiked ? Colors.red : const Color(0xFFFFB300),
-                    _toggleLike,
+
+                  const SizedBox(width: 6),
+                  Text(
+                    ownerName.isEmpty ? 'Unknown' : ownerName,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
                   ),
-                  _buildPillButton(
-                    Icons.share,
-                    'Share',
-                    const Color(0xFFFFB300),
-                    _share,
+                ],
+              ),
+              const SizedBox(height: 6),
+              //view
+              Row(
+                children: [
+                  const Icon(
+                    Icons.visibility,
+                    color: Colors.white38,
+                    size: 17,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '$_viewCount views',
+                    style: const TextStyle(
+                      color: Colors.white38,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // DIVIDER
+              Container(
+                height: 1,
+                color: Colors.white12,
+              ),
+
+              const SizedBox(height: 15),
+              // ACTION BUTTONS
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _toggleLike,
+                      icon: Icon(
+                        _isLiked
+                          ? Icons.favorite
+                          : Icons.favorite_border,
+                        color: _isLiked
+                          ? Colors.red
+                          : Colors.white,
+                      ),
+                      label: Text(
+                        _isLiked ? 'Liked' : 'Like',
+                        style: const TextStyle(
+                          color: Colors.white,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(
+                          color: Colors.white24,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 12),
+
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _toggleFan,
+                      icon: Icon(
+                        _isFan
+                          ? Icons.person
+                          : Icons.person_add,
+                        color: _isFan
+                          ? Colors.red
+                          : Colors.white,
+                      ),
+                      label: const Text(
+                        'Fan',
+                        style: TextStyle(
+                          color: Colors.white,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(
+                          color: Colors.white24,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 12),
+
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _share,
+                      icon: const Icon(
+                        Icons.share,
+                        color: Colors.white,
+                      ),
+                      label: const Text(
+                        'Share',
+                        style: TextStyle(
+                          color: Colors.white,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(
+                          color: Colors.white24,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 13,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ],
 
             const SizedBox(height: 24),
-            const Divider(color: Colors.white24, thickness: 1),
-            const SizedBox(height: 16),
 
             const Text(
               'Description',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 16,
+                fontSize: 17,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 12),
-            if (description.isNotEmpty)
-              Text(
-                description,
-                style: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 13,
-                  height: 1.6,
-                ),
-              ),
 
-            const SizedBox(height: 40),
+            const SizedBox(height: 10),
+
+            Text(
+              description,
+              style: const TextStyle(
+                color: Colors.white60,
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildOwnerRow() {
-    final hasPic = ownerPic.isNotEmpty;
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 20,
-          backgroundColor: Colors.white,
-          backgroundImage:
-              hasPic ? CachedNetworkImageProvider('$_mediaBase/$ownerPic') : null,
-          child: hasPic
-              ? null
-              : const Icon(Icons.music_note, color: Colors.black),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Created by ${ownerName.isEmpty ? 'Unknown' : ownerName}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '$_viewCount views',
-                style: TextStyle(color: Colors.grey[400], fontSize: 12),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPillButton(
-    IconData icon,
-    String label,
-    Color iconColor,
-    VoidCallback onPressed,
-  ) {
-    return ElevatedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, color: iconColor, size: 18),
-      label: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.black87,
-          fontWeight: FontWeight.bold,
-          fontSize: 13,
-        ),
-      ),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.grey[200],
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        elevation: 0,
       ),
     );
   }

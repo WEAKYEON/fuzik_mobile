@@ -780,14 +780,24 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                         }
                                         final videoData=isLandscape?result.landscape:result.portrait;
                                         if (videoData.isEmpty) {
-                                          return const Center(
+                                          final message = searchQuery.trim().isEmpty
+                                              ? 'No videos available.'
+                                              : 'Sorry, we could not find any videos with "$searchQuery".';
+                                          return Center(
                                             child: Padding(
-                                              padding: EdgeInsets.all(40),
-                                              child: Text('ไม่พบข้อมูลวิดีโอ',
-                                                  style: TextStyle(color: Colors.white54, fontSize: 16)),
+                                                padding: const EdgeInsets.all(40),
+                                                child: Text(
+                                                    message,
+                                                    textAlign: TextAlign.center,
+                                                    style: const TextStyle(
+                                                      color: Colors.white54,
+                                                      fontSize: 16,
+                                                    ),
+                                                ) ,
                                             ),
                                           );
                                         }
+
                                         return Padding(
                                           padding: EdgeInsets.fromLTRB(15, 20, 15, 0),
                                           child: GridView.builder(
