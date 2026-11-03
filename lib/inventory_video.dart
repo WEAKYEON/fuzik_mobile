@@ -108,8 +108,9 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
       headers: _mediaHeaders,
     );
     final data=jsonDecode(response.body);
-    final fileLocation = data[0]['file_location'];
-    final uri = Uri.parse('$mediaBaseUrl/$fileLocation');
+    final fileLocation = widget.isCollaboration? data[0]['file_location']:data[0]['video_location'];
+    final url= widget.isCollaboration? '$mediaBaseUrl/$fileLocation':fileLocation;
+    final uri = Uri.parse(url);
       _controller = VideoPlayerController.networkUrl(
         uri,
         httpHeaders: _mediaHeaders,
@@ -619,11 +620,11 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
               ),
             ),
             clipBehavior: Clip.antiAlias,
-            child: youtubeUrl.isNotEmpty
+            child: youtubeUrl.isNotEmpty 
                 ? YouTubeScreen(
               youTubeurl: youtubeUrl,
             )
-                : Column(
+                : widget.isPublished? Column(
                     children: [
                       AspectRatio(
                         aspectRatio: widget.isCollaboration ? 16 / 9 : _controller.value.aspectRatio,
@@ -668,6 +669,17 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
                       ),
                         VideoProgressIndicator(_controller, allowScrubbing: true),
                       ],
+                    ):AspectRatio(
+                        aspectRatio: 16 / 9,
+                        child: Center(
+                          child: Text(
+                            'This video is private',
+                            style: TextStyle(
+                              color: Colors.grey[400],
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
                     )
           ),
 
@@ -699,24 +711,26 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
                 clipBehavior:
                 Clip.antiAlias,
                 child: profileUrl != null
-                    ? Image.network(
-                  profileUrl,
+                    ? CachedNetworkImage(
+                  imageUrl: profileUrl,
                   width: 36,
                   height: 36,
                   fit: BoxFit.cover,
-                  headers:
+                  httpHeaders:
                   _mediaHeaders,
-                  errorBuilder: (
-                      context,
-                      error,
-                      stackTrace,
-                      ) {
-                    return const Icon(
-                      Icons.person,
-                      color: Colors.white,
-                      size: 20,
-                    );
-                  },
+                  placeholder: (context, url){ 
+                        
+                        return const Center(
+                        child:
+                        CircularProgressIndicator(
+                          color: Colors.yellow,
+                        ),
+                      );},
+                  errorWidget: (context, url, error) => const Icon(
+                    Icons.person,
+                    color: Colors.white,
+                    size: 20,
+                  )
                 )
                     : const Icon(
                   Icons.person,

@@ -1338,6 +1338,7 @@ class _InventoryContentState extends State<InventoryContent> {
                         video['void']
                             ?.toString() ==
                             '0',
+                          isCollaboration: false,
                         inventoryVideo: video,
                       ),
                 ),
