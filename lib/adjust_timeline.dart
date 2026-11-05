@@ -8,6 +8,7 @@ import 'package:ffmpeg_kit_flutter_new_audio/ffmpeg_kit.dart';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:just_waveform/just_waveform.dart';
+import 'wallet_api.dart';
 
 class AdjustTimelineScreen extends StatefulWidget {
   final String layoutName;
@@ -394,15 +395,52 @@ void dispose() {
         ),
       );
     }
-
+    double screenWidth = MediaQuery.of(context).size.shortestSide;
+    bool isMobile = screenWidth < 600;
     // if Tablet or phone ia landscape, keep the existing Adjust Timeline UI(max's ipad).
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.black,
         elevation: 0,
-        leading: const BackButton(color: Colors.yellow),
-        title: const Text('Adjust Timeline', style: TextStyle(color: Colors.white)),
+        title: Row(
+          children: [
+            Image.asset('assets/images/FuzikLogo.png', width: 35, height: 35,),
+            SizedBox(width: 10,),
+            Text(
+              isMobile ? 'FZ' : 'FUZIK',
+              style: const TextStyle(
+                color: Colors.yellow,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 2,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          ValueListenableBuilder<WalletSummary?>(
+            valueListenable: walletSummaryNotifier,
+            builder: (context, summary, _) {
+              final pr = summary?.paidBalance;
+              final fz = summary?.freeBalance;
+              return Row(
+                children: [
+                  _buildStatusBadge(
+                    'PR ${pr ?? '—'}/∞',
+                    const Color(0xFF8AB4F8),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildStatusBadge(
+                    'FZ ${fz ?? '—'}/200',
+                    const Color(0xFFFFD600),
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -970,6 +1008,15 @@ Widget _alignmentBar(bool isTablet) {
     ),
   );
 }
+  Widget _buildStatusBadge(String text, Color color) {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(20)),
+        child: Text(text, style: const TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
   //Waves
   Widget BarWaves(
       int index, {
