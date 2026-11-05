@@ -946,11 +946,11 @@ Future<String> generatePreview({
 
   final barMax = math.max(tempBar01, tempBar02);
 
-   bar01 = barMax - tempBar01.toDouble();
-   bar02 = barMax - tempBar02.toDouble();
+   bar01 = tempBar01.toDouble();
+   bar02 = tempBar02.toDouble();
    final hasAudibleTrack = volumes[0] > 0 || volumes[1] > 0;
-  final startTime = hasAudibleTrack ? barMax / 10.0 : 0.0;
-
+  //final startTime = hasAudibleTrack ? barMax /10.0 : 0.0;
+  final startTime=0.0;
   final uri = Uri.https(
     'media05.fuzikapp.com',
     '/ajax_preview2.php',
