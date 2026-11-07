@@ -140,14 +140,20 @@ class _MainLayoutState extends State<MainLayout> {
               final fz = summary?.freeBalance;
               return Row(
                 children: [
-                  _buildStatusBadge(
-                    'PR ${pr ?? '—'}/∞',
-                    const Color(0xFFFFD600),
+                  GestureDetector(
+                    onTap: _goToWallet,
+                    child: _buildStatusBadge(
+                      'PR ${pr ?? '—'}/∞',
+                      const Color(0xFFFFD600),
+                    ),
                   ),
                   const SizedBox(width: 8),
-                  _buildStatusBadge(
-                    'FZ ${fz ?? '—'}/200',
-                    const Color(0xFF8AB4F8),
+                  GestureDetector(
+                    onTap: _goToWallet,
+                    child: _buildStatusBadge(
+                      'FZ ${fz ?? '—'}/200',
+                      const Color(0xFF8AB4F8),
+                    ),
                   ),
                 ],
               );
@@ -203,6 +209,10 @@ class _MainLayoutState extends State<MainLayout> {
     );
   }
 
+
+  void _goToWallet() {
+    setState(() => _selectedIndex = 4);
+  }
 
   Widget _buildStatusBadge(String text, Color color) {
     return Center(

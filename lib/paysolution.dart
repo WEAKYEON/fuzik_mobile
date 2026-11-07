@@ -47,7 +47,7 @@ class _PaySolutionState extends State<PaySolution> {
 
     final deposited = await WalletApi().recordDeposit(
       refno: _referenceNumber!,
-      amount: widget.pack.price,
+      amount: widget.pack.baseCoins + widget.pack.bonusCoins,
     );
     if (!mounted) return;
     if (!deposited) {
@@ -121,9 +121,17 @@ class _PaySolutionState extends State<PaySolution> {
               const Divider(color: _borderColor, height: 1),
               _buildRow('Product', widget.pack.name),
               const Divider(color: _borderColor, height: 1),
-              _buildRow('Coins', widget.pack.coinsLabel),
+              _buildRow('Coins', widget.pack.bonusCoins > 0
+                  ? '${widget.pack.baseCoins} + ${widget.pack.bonusCoins} Coins'
+                  : '${widget.pack.baseCoins} Coins'),
               const Divider(color: _borderColor, height: 1),
-              _buildRow('Amount', '฿${widget.pack.price} THB', emphasize: true),
+              _buildRow(
+                'Amount',
+                widget.pack.priceUsd != null
+                    ? '฿${widget.pack.price} THB (\$${widget.pack.priceUsd} USD)'
+                    : '฿${widget.pack.price} THB',
+                emphasize: true,
+              ),
             ],
           ),
         ),

@@ -12,6 +12,8 @@ class PaySolutionSuccess extends StatefulWidget {
 class _PaySolutionSuccessState extends State<PaySolutionSuccess> {
   static const Color _cardColor = Color(0xFF1B1B1B);
 
+  bool _returning = false;
+
   @override
   void initState() {
     super.initState();
@@ -21,6 +23,13 @@ class _PaySolutionSuccessState extends State<PaySolutionSuccess> {
   Future<void> _confirmAndRefresh() async {
     await WalletApi().confirmDeposits();
     await WalletApi().fetchSummary();
+  }
+
+  Future<void> _backToWallet() async {
+    setState(() => _returning = true);
+    await WalletApi().confirmDeposits();
+    if (!mounted) return;
+    Navigator.pop(context);
   }
 
   @override
@@ -85,7 +94,7 @@ class _PaySolutionSuccessState extends State<PaySolutionSuccess> {
                     ),
                     const SizedBox(height: 28),
                     ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: _returning ? null : _backToWallet,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.yellow,
                         foregroundColor: Colors.black,
