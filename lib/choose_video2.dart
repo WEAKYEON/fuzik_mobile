@@ -494,14 +494,14 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'Choose Video ($totalVideo)',
+          'Choose Video (${selectedVideos.length}/$totalVideo)',
           style: const TextStyle(color: Colors.white),
         ),
       ),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context,c) {
-            final collapsedSize = (44 / c.maxHeight).clamp(0.05, _sheetOpenSize); 
+            final collapsedSize = (44 / c.maxHeight).clamp(0.05, _sheetOpenSize);
             //44 is the height of the arrowtip which appears at the top of the sheet.
             //For future developers, if you want to change one of them, change both.
             final fullHeight = c.maxHeight * 0.9;
@@ -524,6 +524,11 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                         ),
                       ),
                     ),
+
+                    SizedBox(
+                      height: isTablet ? 24 : 16,
+                    ),
+
                     Center(
                       child: Container(
                         decoration: BoxDecoration(
@@ -555,7 +560,7 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                 ),
                               );
                             } 
-                          :null, 
+                          :null,
                         child: const Text("Next")
                         ),
                       ),
@@ -591,9 +596,8 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                               minHeight: 0,
                               maxHeight: fullHeight,
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [  
-                                  _buildSheetArrow(collapsedSize),                       
+                                children: [
+                                  _buildSheetArrow(collapsedSize),
                                    Row(
                                     crossAxisAlignment: CrossAxisAlignment.center,
                                     children: [
@@ -655,7 +659,13 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                       ),
                                     ],
                                   ),
-                                  SizedBox(
+                                  Expanded(
+                                    child: ListView(
+                                      controller: scrollController,
+                                      padding: EdgeInsets.zero,
+                                      children: [
+
+                                    SizedBox(
                                       height: selectedVideos.isEmpty?0:115,
                                       child: SingleChildScrollView(
                                         scrollDirection: Axis.horizontal,
@@ -664,8 +674,10 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                           child: Row(
                                             
                                             children: [
-                                              ...selectedVideos.map((video) {
-                                          
+                                              ...selectedVideos.asMap().entries.map((entry) {
+                                                final index = entry.key;
+                                                final video = entry.value;
+
                                                 return Stack(
                                                   clipBehavior: Clip.none,
                                                   children: [
@@ -681,6 +693,48 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                                         fit:BoxFit.cover,
                                                         errorWidget: (context,url,error)=>Icon(Icons.broken_image_outlined),
                                                       )
+                                                    ),
+                                                    Positioned(
+                                                      top: isTablet ? 8 : 6,
+                                                      left: isTablet ? 12 : 10,
+                                                      child: Container(
+                                                        width: isTablet ? 28 : 22,
+                                                        height: isTablet ? 28 : 22,
+                                                        decoration: const BoxDecoration(
+                                                          color: Color(0xFFFFD600),
+                                                          shape: BoxShape.circle,
+                                                        ),
+                                                        alignment: Alignment.center,
+                                                        child: Text(
+                                                          '${index + 1}',
+                                                          style: TextStyle(
+                                                            color: Colors.black,
+                                                            fontWeight: FontWeight.bold,
+                                                            fontSize: isTablet ? 13 : 11,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    Positioned(
+                                                      top: isTablet ? 8 : 6,
+                                                      left: isTablet ? 12 : 10,
+                                                      child: Container(
+                                                        width: isTablet ? 28 : 22,
+                                                        height: isTablet ? 28 : 22,
+                                                        decoration: const BoxDecoration(
+                                                          color: Color(0xFFFFD600),
+                                                          shape: BoxShape.circle,
+                                                        ),
+                                                        alignment: Alignment.center,
+                                                        child: Text(
+                                                          '${index + 1}',
+                                                          style: TextStyle(
+                                                            color: Colors.black,
+                                                            fontWeight: FontWeight.bold,
+                                                            fontSize: isTablet ? 13 : 11,
+                                                          ),
+                                                        ),
+                                                      ),
                                                     ),
                                                     Positioned(
                                                       top:-5,
@@ -700,6 +754,7 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                                             borderRadius: BorderRadius.circular(25),
                                                             color: Colors.red
                                                           ),
+
                                                           child: Icon(
                                                             Icons.close,
                                                             size: 14,),
@@ -778,16 +833,17 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                     ),
                                   ),
                                   SizedBox(width:double.infinity, height: 20,) ,
-                                  Expanded(
-                                      child:                               
                                       FutureBuilder<FetchVideos>(                           
                                         future:_videosFuture,
                                         builder: (context, snapshot) {
                                         if (snapshot.connectionState == ConnectionState.waiting) {
-                                          return ListView(
-                                            controller: scrollController,
-                                            padding: const EdgeInsets.only(top: 40),
-                                            children: [Center(child: const CircularProgressIndicator(color: Color(0xFFFFD600)),)],
+                                          return const Padding(
+                                            padding: EdgeInsets.only(top: 40),
+                                            child: Center(
+                                              child: CircularProgressIndicator(
+                                                  color: Color(0xFFFFD600),
+                                              ),
+                                            ),
                                           );
                                         }
                                         final result=snapshot.data;
@@ -820,20 +876,27 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                         return Padding(
                                           padding: EdgeInsets.fromLTRB(15, 20, 15, 0),
                                           child: GridView.builder(
-                                            controller: scrollController,
+                                            //controller: scrollController,
                                             shrinkWrap: true,
-                                            //physics: const NeverScrollableScrollPhysics(),
+                                            physics: const NeverScrollableScrollPhysics(),
                                             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                                               crossAxisCount: isTablet?orientation==SlotOrientation.portrait?5:3: orientation==SlotOrientation.portrait?3:2, 
-                                              crossAxisSpacing: isTablet?10:5, 
-                                              mainAxisSpacing: isTablet?10:5, 
-                                              childAspectRatio: isLandscape?4/3:1/2, 
+                                              crossAxisSpacing: isTablet?10:8,
+                                              mainAxisSpacing: isTablet?10:8,
+                                              childAspectRatio: isTablet
+                                                  ? (isLandscape? 1.20 : 0.48)
+                                                  : (isLandscape ? 1.10 : 0.42),
                                             ),
                                             itemCount: videoData.length,
                                             itemBuilder: (context, index) {
                                               final video = videoData[index];
                                           
                                               final preview = video['preview']?.toString()??'';
+                                              final selectedIndex = selectedVideos.indexWhere(
+                                                    (selected) => selected['url'] == video['url'],
+                                              );
+
+                                              final isSelected = selectedIndex != -1;
                                               bool checkArtist= video['artist']?.toString().toLowerCase()=="yes" ;
                                               return GestureDetector(
                                                 onTap: ()async{
@@ -891,7 +954,9 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                                   setState(() =>selectedVideos.add(video)                                            
                                                   );
                                                 },
-                                                child: Container(
+                                            child: Stack(
+                                              children: [
+                                                Container(
                                                   padding:const EdgeInsets.only(left: 2, right: 2),
                                                   width: double.infinity,
                                                     child: Column(
@@ -940,28 +1005,58 @@ Widget _slot(List<dynamic> selectedVideos, int index) {
                                                           ),
                                                         ),
                                                         SizedBox(height: 5),
-                                                        Text('${video['video_title']}', style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis, maxLines: 2,),
+                                                        Text('${video['video_title']}', style: TextStyle(color: Colors.white, fontSize: isTablet ? 15 : 13, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis, maxLines: 2,),
                                                       ],
                                                     ),
                                                   
                                                 ),
+                                                if (isSelected)
+                                                  Positioned(
+                                                    top: isTablet ? 10 : 6,
+                                                    right: isTablet ? 10 : 6,
+                                                    child: Container(
+                                                      width: isTablet ? 32 : 24,
+                                                      height: isTablet ? 32 : 24,
+                                                      decoration: const BoxDecoration(
+                                                        color: Color(0xFFFFD600),
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                      alignment: Alignment.center,
+                                                      child: Text(
+                                                        '${selectedIndex + 1}',
+                                                        style: TextStyle(
+                                                          color: Colors.black,
+                                                          fontWeight: FontWeight.bold,
+                                                          fontSize: isTablet ? 14 :11,
+                                                        ),
+                                                       ),
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+
                                               );
                                             },
                                           ),
                                         );
                                       },
                                     ),
-                                  )
+
                                       ],
-                              
+                                    ),
                                   ),
+
+                                ],
+                              ),
                             ),
                           ),
-                        );}
-                    ),
+                        );
+                      },
+                ),
+
               ],
             );
-          }
+          },
         ),
       ),
     );

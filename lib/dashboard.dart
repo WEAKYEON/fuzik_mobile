@@ -83,11 +83,18 @@ class DashboardContentState extends State<DashboardContent> {
 
   @override
   Widget build(BuildContext context) {
-    
+    //this below commented version cause card height overflow in small phone
+    /*
     double screenWidth = MediaQuery.of(context).size.shortestSide;
     double paddingHorizontal = screenWidth < 600 ? 16.0 : 40.0;
     bool isTablet = screenWidth >= 600;
     int columns = screenWidth < 400 ? 1 : (screenWidth < 600 ? 2 : 3);
+    */
+
+    final screenSize = MediaQuery.of(context).size.shortestSide;
+    final bool isTablet = screenSize >= 600;
+    final double paddingHorizontal = isTablet ? 40.0 : 16.0;
+    final int columns = isTablet ? 3 : 2;
 
     return RefreshIndicator(
       backgroundColor: Colors.yellow,
@@ -300,6 +307,8 @@ class DashboardContentState extends State<DashboardContent> {
             }
             ):Container(),
 
+            SizedBox(height: 20),
+
             Text(isSoloSelected ? 'Landscape' : 'Jam', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             // Landscape
@@ -438,8 +447,10 @@ class DashboardContentState extends State<DashboardContent> {
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: columns, 
                     crossAxisSpacing: 16, 
-                    mainAxisSpacing: 10, 
-                    childAspectRatio: columns == 1 ? 1.5 : 1.0, 
+                    mainAxisSpacing: 10,
+                    childAspectRatio: isTablet
+                        ? 1.0
+                        : (columns == 1 ? 1.5 : 0.96),
                   ),
                   itemCount: videos.length,
                   itemBuilder: (context, index) {

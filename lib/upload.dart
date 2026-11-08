@@ -23,6 +23,7 @@ class _UploadContentState extends State<UploadContent> {
   bool _isFileSelected = false;
   bool _acceptTerms = false;
   bool _isPublicDomain = false;
+  bool _isUploading = false;
 
   File? _selectedVideo;
   VideoPlayerController? _videoPlayerController;
@@ -98,9 +99,13 @@ class _UploadContentState extends State<UploadContent> {
   }
 
   Future<void> _uploadVideo() async {
-    if (_selectedVideo == null) {
+    if (_isUploading || _selectedVideo == null) {
       return;
     }
+
+    setState(() {
+      _isUploading = true;
+    });
 
     try {
       final request = http.MultipartRequest(
@@ -204,13 +209,19 @@ class _UploadContentState extends State<UploadContent> {
     } catch (e) {
       print('Upload error: $e');
 
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Upload error: $e'),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Upload error: $e'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
+      }
     }
   }
 
@@ -347,7 +358,7 @@ class _UploadContentState extends State<UploadContent> {
                 _videoPlayerController!.value.isPlaying
                     ? Icons.pause_circle_outline
                     : Icons.play_circle_fill,
-                color: Colors.white.withOpacity(0.7),
+                color: Colors.white.withValues(alpha: 0.7),
                 size: 64,
               ),
             ),
@@ -438,14 +449,23 @@ class _UploadContentState extends State<UploadContent> {
       const SizedBox(height: 20),
 
       ElevatedButton(
-        onPressed: (_acceptTerms && _isPublicDomain)
+        onPressed: (_acceptTerms && _isPublicDomain && !_isUploading)
             ? _uploadVideo
             : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFFFFD600),
           disabledBackgroundColor: Colors.grey,
         ),
-        child: const Text(
+        child: _isUploading
+            ? const SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: Colors.black,
+          ),
+        )
+            : const Text(
           'Save information',
           style: TextStyle(
             color: Colors.black,

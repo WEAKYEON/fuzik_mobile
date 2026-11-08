@@ -10,6 +10,7 @@ import audio_session
 import connectivity_plus
 import ffmpeg_kit_flutter_new_audio
 import file_selector_macos
+import gal
 import just_audio
 import just_waveform
 import share_plus
@@ -25,6 +26,7 @@ func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
   ConnectivityPlusPlugin.register(with: registry.registrar(forPlugin: "ConnectivityPlusPlugin"))
   FFmpegKitFlutterPlugin.register(with: registry.registrar(forPlugin: "FFmpegKitFlutterPlugin"))
   FileSelectorPlugin.register(with: registry.registrar(forPlugin: "FileSelectorPlugin"))
+  GalPlugin.register(with: registry.registrar(forPlugin: "GalPlugin"))
   JustAudioPlugin.register(with: registry.registrar(forPlugin: "JustAudioPlugin"))
   JustWaveformPlugin.register(with: registry.registrar(forPlugin: "JustWaveformPlugin"))
   SharePlusMacosPlugin.register(with: registry.registrar(forPlugin: "SharePlusMacosPlugin"))

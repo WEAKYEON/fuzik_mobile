@@ -2,8 +2,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import 'inventory_video.dart';
-
+import 'package:cached_network_image/cached_network_image.dart';
 
 class InventoryContent extends StatefulWidget {
   final bool isActive;
@@ -467,6 +468,8 @@ class _InventoryContentState extends State<InventoryContent> {
 
   @override
   Widget build(BuildContext context) {
+    //this below commented version cause card overflow in small phone
+    /*
     final screenWidth =
         MediaQuery.of(context).size.width;
 
@@ -479,6 +482,21 @@ class _InventoryContentState extends State<InventoryContent> {
 
     final portraitColumns =
     screenWidth < 600 ? 3 : 4;
+    */
+
+    final screenSize =
+        MediaQuery.of(context).size.shortestSide;
+
+    final bool isTablet = screenSize >= 600;
+
+    final double paddingHorizontal =
+    isTablet ? 40.0 : 16.0;
+
+    final int columns =
+    isTablet ? 4 : 2;
+
+    final int portraitColumns =
+    isTablet ? 4 : 3;
 
     if (_isLoading) {
       return const Center(
@@ -1018,46 +1036,28 @@ class _InventoryContentState extends State<InventoryContent> {
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
                 color: Colors.white
-                    .withOpacity(0.08),
+                    .withValues(alpha: 0.08),
                 borderRadius:
                 BorderRadius.circular(8),
                 border: Border.all(
                   color: const Color(
                     0xFFFFD600,
-                  ).withOpacity(0.4),
+                  ).withValues(alpha: 0.4),
                   width: 1,
                 ),
               ),
               child: preview != null
-                  ? Image.network(
-                preview,
+                  ? CachedNetworkImage(
+                imageUrl: preview,
                 fit: BoxFit.cover,
                 width: double.infinity,
                 height: double.infinity,
-                headers: _mediaHeaders,
-                loadingBuilder: (
+                httpHeaders: _mediaHeaders,
+                placeholder: (context, url) => Center(child: CircularProgressIndicator(color:Colors.yellow)),
+                errorWidget: (
                     context,
-                    child,
-                    loadingProgress,
-                    ) {
-                  if (loadingProgress ==
-                      null) {
-                    return child;
-                  }
-
-                  return const Center(
-                    child:
-                    CircularProgressIndicator(
-                      color: Color(
-                        0xFFFFD600,
-                      ),
-                    ),
-                  );
-                },
-                errorBuilder: (
-                    context,
+                    url,
                     error,
-                    stackTrace,
                     ) {
                   return const Center(
                     child: Icon(
@@ -1096,16 +1096,16 @@ class _InventoryContentState extends State<InventoryContent> {
               ),
               clipBehavior: Clip.antiAlias,
               child: profileUrl != null
-                  ? Image.network(
-                profileUrl,
+                  ? CachedNetworkImage(
+                imageUrl: profileUrl,
                 width: 30,
                 height: 30,
                 fit: BoxFit.cover,
-                headers: _mediaHeaders,
-                errorBuilder: (
+                httpHeaders: _mediaHeaders,
+                errorWidget: (
                     context,
+                    url,
                     error,
-                    stackTrace,
                     ) {
                   return const Icon(
                     Icons.person,
@@ -1338,6 +1338,7 @@ class _InventoryContentState extends State<InventoryContent> {
                         video['void']
                             ?.toString() ==
                             '0',
+                          isCollaboration: false,
                         inventoryVideo: video,
                       ),
                 ),
@@ -1351,13 +1352,13 @@ class _InventoryContentState extends State<InventoryContent> {
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
                 color: Colors.white
-                    .withOpacity(0.08),
+                    .withValues(alpha: 0.08),
                 borderRadius:
                 BorderRadius.circular(8),
                 border: Border.all(
                   color: const Color(
                     0xFFFFD600,
-                  ).withOpacity(0.4),
+                  ).withValues(alpha: 0.4),
                   width: 1,
                 ),
               ),
@@ -1366,54 +1367,22 @@ class _InventoryContentState extends State<InventoryContent> {
                   // VIDEO PREVIEW
                   Positioned.fill(
                     child: preview != null
-                        ? Image.network(
-                      preview,
+                        ? CachedNetworkImage(
+                      imageUrl: preview,
                       fit: BoxFit.cover,
-                      width:
-                      double.infinity,
-                      height:
-                      double.infinity,
-                      headers:
-                      _mediaHeaders,
-                      loadingBuilder: (
-                          context,
-                          child,
-                          loadingProgress,
-                          ) {
-                        if (loadingProgress ==
-                            null) {
-                          return child;
-                        }
-
-                        return const Center(
-                          child:
-                          CircularProgressIndicator(
-                            color: Color(
-                              0xFFFFD600,
-                            ),
-                          ),
-                        );
-                      },
-                      errorBuilder: (
-                          context,
-                          error,
-                          stackTrace,
-                          ) {
-                        debugPrint(
-                          'Invontory.dart line 1403 PREVIEW ERROR: '
-                              '$preview | $error',
-                        );
-
+                      width: double.infinity,
+                      height:double.infinity,
+                      httpHeaders:_mediaHeaders,
+                      placeholder: (context, url) => Center(child: CircularProgressIndicator(color:Colors.yellow)),
+                      errorWidget:(context,url,error){
                         return const Center(
                           child: Icon(
-                            Icons
-                                .broken_image,
-                            color: Colors
-                                .white54,
+                            Icons.broken_image,
+                            color: Colors.white54,
                             size: 48,
                           ),
                         );
-                      },
+                      }
                     )
                         : const Center(
                       child: Icon(
@@ -1431,8 +1400,8 @@ class _InventoryContentState extends State<InventoryContent> {
                     Positioned.fill(
                       child: Container(
                         color: Colors.black
-                            .withOpacity(
-                          0.55,
+                            .withValues(
+                          alpha: 0.55,
                         ),
                       ),
                     ),
@@ -1452,8 +1421,8 @@ class _InventoryContentState extends State<InventoryContent> {
                         decoration:
                         BoxDecoration(
                           color: Colors.black
-                              .withOpacity(
-                            0.75,
+                              .withValues(
+                            alpha: 0.75,
                           ),
                           borderRadius:
                           BorderRadius
