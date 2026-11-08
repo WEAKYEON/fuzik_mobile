@@ -3,6 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'youtube_player.dart';
+import 'package:video_player/video_player.dart';
+import 'dart:developer';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:fuzik_mobile/services/video_downloader.dart';
+import 'package:fuzik_mobile/services/fetch_videos.dart';
+import 'wallet_api.dart';
 
 class InventoryVideoScreen extends StatefulWidget {
   final String videoUrl;
@@ -35,20 +41,93 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
   static const Map<String, String> _mediaHeaders = {
     'Referer': 'https://fuzikapp.com',
   };
-
+  late VideoPlayerController _controller;
   Map<String, dynamic>? video;
 
   bool isLoading = true;
   bool _isPublished = false;
-
+  bool hasVideoController=false;
   String? _profilePicturePath;
   int viewCount = 0;
+  String videoLink='';
+  final downloader = VideoDownloader();
+  final ValueNotifier<double?> _progress = ValueNotifier<double?>(0);
+  bool _downloading = false;
 
+  Future<void> downloadVideo(String videoLink, String videoCode) async{
+    DownloadResult result;
+    if(_downloading) return;
+    if(!await hasNetwork()){
+      if(!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red,
+          content: Text("You are offline!", style: TextStyle(color: Colors.white))
+        )
+      );
+      return;
+    }
+    setState(() {
+      _downloading = true;
+    });
+    _progress.value = 0;
+    try{
+      result = await downloader.downloadToGallery(
+                   url: videoLink,                     // the media URL, not the jam2_watch API URL
+                   fileName: 'fuzik_${widget.videoUrl}', //This videoUrl represents the code e.g 8A5xi09j50
+                   onProgress: (p) {
+                    if (mounted) _progress.value = p;   // null means the size is unknown
+                  },
+                );
+        }finally{
+          if (mounted) setState(() => _downloading = false);
+        }
+      if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            backgroundColor: result.isSuccess ? Colors.green : Colors.red,
+            content: Text(result.isSuccess ? 'Saved to your gallery' : result.message ?? 'Cancelled', style: TextStyle(color: Colors.white)),
+          ));
+  }
   @override
   void initState() {
     super.initState();
     _isPublished = widget.isPublished;
     _loadVideo();
+    _initializeVideoPlayer(widget.videoUrl);
+  }
+
+  @override dispose(){
+    if(hasVideoController){
+      _controller.dispose();
+    }
+    downloader.cancel();
+    _progress.dispose();
+    super.dispose();
+  }
+  Future<void> _initializeVideoPlayer(String videoCode) async {
+    String videoUrl= widget.isCollaboration ? '$baseUrl/jam2_watch?j=$videoCode' : '$baseUrl/play2_watch?p=$videoCode';
+    final response = await http.get(
+      Uri.parse(videoUrl),
+      headers: _mediaHeaders,
+    );
+    final data=jsonDecode(response.body);
+    final fileLocation = widget.isCollaboration? data[0]['file_location']:data[0]['video_location'];
+    final url= widget.isCollaboration? '$mediaBaseUrl/$fileLocation':fileLocation;
+    final uri = Uri.parse(url);
+      _controller = VideoPlayerController.networkUrl(
+        uri,
+        httpHeaders: _mediaHeaders,
+      );
+      setState(() {
+        videoLink=uri.toString();
+      });
+      try{
+        await _controller.initialize();
+        hasVideoController=true;
+      } catch (e) {
+        log('Error initializing video player',name: 'InventoryVideoScreen',error: e,stackTrace: StackTrace.current);
+        hasVideoController=false;
+      }
   }
 
   String? _getMediaUrl(String? path) {
@@ -378,6 +457,37 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
     }
   }
 
+  Future<bool> showCoinUsageConfirmationForVideoDownload()async{
+    if(!mounted) return false;
+    final result= await showDialog<bool>(
+      context:context,
+      barrierDismissible:false,
+      builder:(BuildContext context){
+        return AlertDialog(
+          title:Text("Confirm Download"),
+          content:Text("Downloading this video will cost 10 FZ coins. Do you want to proceed?"),
+          actions: [
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style:ElevatedButton.styleFrom(
+                backgroundColor: Colors.yellow,
+                foregroundColor: Colors.black,
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Confirm'),
+            ),
+          ],
+        );
+      }
+    );
+    return result ?? false;
+  }
 
   Future<void> _getViewCount() async {
     try {
@@ -447,30 +557,52 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
 
   @override
   Widget build(BuildContext context) {
+    double screenWidth = MediaQuery.of(context).size.shortestSide;
+    bool isMobile = screenWidth < 600;
     return Scaffold(
       backgroundColor: Colors.black,
 
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back,
-            color: Colors.white,
-          ),
-          onPressed: () {
-            Navigator.pop(context, true);
-          },
+        title: Row(
+          children: [
+            Image.asset('assets/images/FuzikLogo.png', width: 35, height: 35,),
+            SizedBox(width: 10,),
+            Text(
+              isMobile ? 'FZ' : 'FUZIK',
+              style: const TextStyle(
+                color: Colors.yellow,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 2,
+              ),
+            ),
+          ],
         ),
-        title: Text(
-          widget.isCollaboration
-              ? 'Collaboration Details'
-              : 'Video Details',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
+        actions: [
+          ValueListenableBuilder<WalletSummary?>(
+            valueListenable: walletSummaryNotifier,
+            builder: (context, summary, _) {
+              final pr = summary?.paidBalance;
+              final fz = summary?.freeBalance;
+              return Row(
+                children: [
+                  _buildStatusBadge(
+                    'PR ${pr ?? '—'}/∞',
+                    const Color(0xFF8AB4F8),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildStatusBadge(
+                    'FZ ${fz ?? '—'}/200',
+                    const Color(0xFFFFD600),
+                  ),
+                ],
+              );
+            },
           ),
-        ),
+          const SizedBox(width: 8),
+        ],
       ),
 
       body: isLoading
@@ -543,7 +675,7 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
         CrossAxisAlignment.start,
         children: [
           // YOUTUBE PLAYER
-
+    
           Container(
             width: double.infinity,
             decoration: BoxDecoration(
@@ -557,38 +689,71 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
               ),
             ),
             clipBehavior: Clip.antiAlias,
-            child: youtubeUrl.isNotEmpty
+            child: youtubeUrl.isNotEmpty 
                 ? YouTubeScreen(
               youTubeurl: youtubeUrl,
             )
-                : const AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Center(
-                child: Column(
-                  mainAxisAlignment:
-                  MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.video_library_outlined,
-                      color: Colors.white54,
-                      size: 44,
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Video unavailable',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
+                : widget.isPublished? Column(
+                    children: [
+                      AspectRatio(
+                        aspectRatio: widget.isCollaboration ? 16 / 9 : _controller.value.aspectRatio,
+                        child: ValueListenableBuilder<VideoPlayerValue>(
+                          valueListenable: _controller,
+                          builder: (context, value, child) {
+                            // Show the poster until the video position moves past zero
+                            final showPoster = value.position == Duration.zero ;
+                            return Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                VideoPlayer(_controller),
+                                if (showPoster)
+                                  CachedNetworkImage(
+                                    imageUrl: widget.isCollaboration?'$mediaBaseUrl/${widget.inventoryVideo?['preview']}': widget.inventoryVideo?['preview']?.toString() ?? '',
+                                    fit:BoxFit.cover,
+                                    placeholder: (context, url) => SizedBox(width:50, height: 50, child: CircularProgressIndicator(color: Colors.yellow,)),
+                                    errorWidget: (context, url, error) {
+                                      return const Icon(
+                                        Icons.image_not_supported,
+                                        color: Colors.white,
+                                        size: 50,
+                                      );
+                                    },
+                                    ),
+                                Center(
+                                  child: IconButton(
+                                    iconSize: 100,
+                                    color: Colors.yellow,
+                                    icon: Icon(value.isPlaying
+                                        ? Icons.pause_circle_filled_rounded
+                                        : Icons.play_circle_fill_rounded),
+                                    onPressed: () {
+                                      value.isPlaying ? _controller.pause() : _controller.play();
+                                    },
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+                        VideoProgressIndicator(_controller, allowScrubbing: true),
+                      ],
+                    ):AspectRatio(
+                        aspectRatio: 16 / 9,
+                        child: Center(
+                          child: Text(
+                            'This video is private',
+                            style: TextStyle(
+                              color: Colors.grey[400],
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                    )
           ),
-
+    
           const SizedBox(height: 20),
-
+    
           Text(
             title,
             style: const TextStyle(
@@ -597,11 +762,11 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
               fontWeight: FontWeight.bold,
             ),
           ),
-
+    
           const SizedBox(height: 8),
-
+    
           // PROFILE and CREATOR
-
+    
           Row(
             children: [
               Container(
@@ -615,24 +780,26 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
                 clipBehavior:
                 Clip.antiAlias,
                 child: profileUrl != null
-                    ? Image.network(
-                  profileUrl,
+                    ? CachedNetworkImage(
+                  imageUrl: profileUrl,
                   width: 36,
                   height: 36,
                   fit: BoxFit.cover,
-                  headers:
+                  httpHeaders:
                   _mediaHeaders,
-                  errorBuilder: (
-                      context,
-                      error,
-                      stackTrace,
-                      ) {
-                    return const Icon(
-                      Icons.person,
-                      color: Colors.white,
-                      size: 20,
-                    );
-                  },
+                  placeholder: (context, url){ 
+                        
+                        return const Center(
+                        child:
+                        CircularProgressIndicator(
+                          color: Colors.yellow,
+                        ),
+                      );},
+                  errorWidget: (context, url, error) => const Icon(
+                    Icons.person,
+                    color: Colors.white,
+                    size: 20,
+                  )
                 )
                     : const Icon(
                   Icons.person,
@@ -640,9 +807,9 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
                   size: 20,
                 ),
               ),
-
+    
               const SizedBox(width: 10),
-
+    
               Expanded(
                 child: Column(
                   crossAxisAlignment:
@@ -658,9 +825,9 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
                         fontSize: 14,
                       ),
                     ),
-
+    
                     const SizedBox(height: 3),
-
+    
                     Text(
                       '$views views • $createdTime',
                       style: TextStyle(
@@ -672,11 +839,70 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
                   ],
                 ),
               ),
+              //Download button for collaboration videos
+        if(widget.isCollaboration)...[
+          if (_downloading)
+            SizedBox(
+              width: 120,
+              height: 200,
+              child: Column(
+                children: [
+                  ValueListenableBuilder<double?>(
+                    valueListenable: _progress,
+                    builder: (context, p, _) {
+                      final saving=p!=null && p>=1.0;
+                      return Column(
+                      children: [
+                        LinearProgressIndicator(value: saving ? null : p),  // null shows the "unknown length" animation
+                        const SizedBox(height: 6),
+                        Text(saving?"Saving to gallary":p == null ? 'Downloading...' : '${(p * 100).toStringAsFixed(0)}%'),
+                      ],
+                    );}
+                  ),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      backgroundColor: Colors.red,
+                    ),
+                    onPressed:(){
+                    downloader.cancel();
+                    setState(() {
+                      _downloading=false;
+                    });
+                  } , child: const Text('Cancel')),
+                ],
+              ),
+            )
+          else
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(15),
+                color:Colors.yellow,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.yellow.withValues(alpha: 0.5),
+                    spreadRadius: 2,
+                    blurRadius: 10,
+                  ),
+                ],
+              ),
+              child: IconButton(
+                color:Colors.black,
+                icon: const Icon(Icons.download),
+                onPressed: () async{
+                  final isConfirmed = await showCoinUsageConfirmationForVideoDownload();
+                  if(isConfirmed){
+                    //coin deduction logic here();
+                    downloadVideo(videoLink, widget.videoUrl);
+                  }
+                },
+              ),
+            ),
+        ],
             ],
           ),
-
+    
           const SizedBox(height: 20),
-
           // EDIT, publish/unpublish
         if (!widget.isCollaboration) ...[
           Row(
@@ -709,9 +935,9 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
                   ),
                 ),
               ),
-
+    
               const SizedBox(width: 12),
-
+    
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {
@@ -750,14 +976,14 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
           ),
           const SizedBox(height: 24),
         ],
-
+    
           const Divider(
             color: Colors.white24,
             thickness: 1,
           ),
-
+    
           const SizedBox(height: 20),
-
+    
           const Text(
             'Description',
             style: TextStyle(
@@ -766,9 +992,9 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
               fontWeight: FontWeight.bold,
             ),
           ),
-
+    
           const SizedBox(height: 12),
-
+    
           if (widget.isCollaboration) ...[
             Text(
               'This collaboration consists of:',
@@ -778,10 +1004,10 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
                 height: 1.6,
               ),
             ),
-
+    
             const SizedBox(height: 8),
           ],
-
+    
           Text(
             description.isEmpty
                 ? 'No description'
@@ -794,9 +1020,9 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
               height: 1.6,
             ),
           ),
-
+    
           const SizedBox(height: 24),
-
+    
           if (!widget.isCollaboration) ...[
             const Text(
               'Music Information',
@@ -806,30 +1032,30 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-
+    
             const SizedBox(height: 14),
-
+    
             if (musicTitle.isNotEmpty)
               _buildInfoRow(
                 'Music',
                 musicTitle,
               ),
-
+    
             if (originalPerformer.isNotEmpty)
               _buildInfoRow(
                 'Original Performer',
                 originalPerformer,
               ),
-
+    
             if (instrument.isNotEmpty)
               _buildInfoRow(
                 'Instrument',
                 instrument,
               ),
-
+    
             const SizedBox(height: 20),
           ],
-
+    
         ],
       ),
     );
@@ -1300,7 +1526,16 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
     );
   }
 
-
+   Widget _buildStatusBadge(String text, Color color) {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(20)),
+        child: Text(text, style: const TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
+  
   Widget _buildInfoRow(
       String label,
       String value,

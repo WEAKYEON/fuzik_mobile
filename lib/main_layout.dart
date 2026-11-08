@@ -11,11 +11,11 @@ import 'wallet_api.dart';
 import 'login_screen.dart';
 import 'edit_profile.dart';
 import 'change_password.dart';
-import 'wallet.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:cached_network_image/cached_network_image.dart';
 
+String email='';
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
 
@@ -29,7 +29,6 @@ class _MainLayoutState extends State<MainLayout> {
   int _selectedIndex = 0;
   String _displayName = 'User';
   String _profilePic = '';
-
   final WalletApi _walletApi = WalletApi();
   Timer? _balanceTimer;
 
@@ -40,6 +39,7 @@ class _MainLayoutState extends State<MainLayout> {
     print('Current user: $user'); // Debugging line to check the current user
     if (user != null && user.email != null) {
       print(user);
+      email=user.email!;
       _displayName = user.email!.split('@')[0].isNotEmpty 
           ? user.email!.split('@')[0] 
           : 'User';
@@ -140,14 +140,20 @@ class _MainLayoutState extends State<MainLayout> {
               final fz = summary?.freeBalance;
               return Row(
                 children: [
-                  _buildStatusBadge(
-                    'PR ${pr ?? '—'}/∞',
-                    const Color(0xFF8AB4F8),
+                  GestureDetector(
+                    onTap: _goToWallet,
+                    child: _buildStatusBadge(
+                      'PR ${pr ?? '—'}/∞',
+                      const Color(0xFFFFD600),
+                    ),
                   ),
                   const SizedBox(width: 8),
-                  _buildStatusBadge(
-                    'FZ ${fz ?? '—'}/200',
-                    const Color(0xFFFFD600),
+                  GestureDetector(
+                    onTap: _goToWallet,
+                    child: _buildStatusBadge(
+                      'FZ ${fz ?? '—'}/200',
+                      const Color(0xFF8AB4F8),
+                    ),
                   ),
                 ],
               );
@@ -188,9 +194,9 @@ class _MainLayoutState extends State<MainLayout> {
             _selectedIndex = index;
           });
 
-          if (index == 0) {
-            _dashboardKey.currentState?.refreshDashboardData();
-          }
+          // if (index == 0) {
+          //   _dashboardKey.currentState?.refreshDashboardData();
+          // }
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
@@ -203,6 +209,10 @@ class _MainLayoutState extends State<MainLayout> {
     );
   }
 
+
+  void _goToWallet() {
+    setState(() => _selectedIndex = 4);
+  }
 
   Widget _buildStatusBadge(String text, Color color) {
     return Center(

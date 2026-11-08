@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'main_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:just_audio/just_audio.dart';
@@ -8,6 +10,11 @@ import 'package:ffmpeg_kit_flutter_new_audio/ffmpeg_kit.dart';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:just_waveform/just_waveform.dart';
+import 'package:fuzik_mobile/services/fetch_videos.dart';
+import 'package:fuzik_mobile/wallet_api.dart';
+import 'web_video_player.dart';
+import 'httpsVideoPlayer.dart';
+import 'wallet_api.dart';
 
 class AdjustTimelineScreen extends StatefulWidget {
   final String layoutName;
@@ -27,7 +34,13 @@ class _AdjustTimelineScreenState extends State<AdjustTimelineScreen> {
   final List<Color> trackColors = [const Color(0xFFFFFF12), Colors.yellow, Colors.yellow, Colors.yellow];
   late List<AudioPlayer> players;
   late List<Waveform?> waveforms;
+  List<String> videoDimensions=[];
+  List<String> videoLocations=[];
   bool isMasterPlaying=false;
+  bool isPreviewReady=false;
+  bool isPreviewLoading=false;
+  String previewGeneratingError='Preview will be shown here.';
+  String previewVideoUrl='';
   double zoom = 1.0;
   double get pixelsPerSecond => 120.0 * zoom;
   late List<double> audioDelays;
@@ -42,6 +55,7 @@ class _AdjustTimelineScreenState extends State<AdjustTimelineScreen> {
   static const double _gapAfterBadge = 20;
   static const double _gapAfterThumb = 12;
   late List<bool> _volumeOpen;
+  String audioInitializationError='';
   double guideSeconds=1.0;
   double get _guideX=> guideSeconds*pixelsPerSecond;
   bool get _anythingActive =>players.any((p) => p.playing) || _waiting.any((w) => w);
@@ -88,63 +102,117 @@ double get maxScroll =>(maxTimelineWidth - _viewportWidth).clamp(0.0, double.inf
   return maxWidth;
 }
 
-Future<File> getCachedAudio(String videoCode, String videoUrl) async{
-    final cacheDir= await getTemporaryDirectory();
-    final audioFile=File('${cacheDir.path}/$videoCode.mp3');
-    if(await audioFile.exists()){
-      print('Using cached audio: ${audioFile.path}');
-      return audioFile;
-    }
+Future<File> getCachedAudio(String videoCode, String videoUrl) async {
+  final cacheDir = await getTemporaryDirectory();
+  final audioFile = File('${cacheDir.path}/$videoCode.mp3');
+  final videoFile = File('${cacheDir.path}/$videoCode.mp4');
+  final partFile = File('${cacheDir.path}/$videoCode.mp4.part');
 
-    final videoFile = File('${cacheDir.path}/$videoCode.mp4',);
-    if(!await videoFile.exists()){
-      final response=await http.get(
-        Uri.parse(videoUrl),
-        headers: {
-          'Referer':"https://fuzikapp.com",
-        },
-      );
+  // 1. Valid cached audio: use it
+  if (await audioFile.exists() && await audioFile.length() > 0) {
+    debugPrint('Using cached audio: ${audioFile.path}');
+    return audioFile;
+  }
+
+  // 2. Remove leftovers from earlier failed runs 
+  for (final f in [videoFile, partFile, audioFile]) {
+    if (await f.exists()) await f.delete();
+  }
+
+  try {
+    // 3. Download to a .part file, so a half-finished download is never mistaken for a video
+    final client = http.Client();
+    try {
+      final request = http.Request('GET', Uri.parse(videoUrl))
+        ..headers['Referer'] = 'https://fuzikapp.com';
+
+      final response =
+          await client.send(request).timeout(const Duration(seconds: 60));
       if (response.statusCode != 200) {
+        throw Exception('Failed to download video: ${response.statusCode}');
+      }
+
+      final type = (response.headers['content-type'] ?? '').toLowerCase();
+      await response.stream
+          .pipe(partFile.openWrite())
+          .timeout(const Duration(minutes: 2));
+
+      // 4. Make sure we really got a video, not an error message
+      final size = await partFile.length();
+      if (size < 1024 || type.startsWith('text/') || type.contains('json')) {
+        final bytes = await partFile.readAsBytes();
+        final text = String.fromCharCodes(bytes.take(200));
         throw Exception(
-          'Failed to download video: ${response.statusCode}',
-        );
+            'Server did not return a video ($type, $size bytes): $text');
       }
-      await videoFile.writeAsBytes(response.bodyBytes);
+      await partFile.rename(videoFile.path);
+    } finally {
+      client.close();
     }
-    final session = await FFmpegKit.execute(
-      '-i "${videoFile.path}" -vn -c:a copy "${audioFile.path}"',
-    );
-    final returnCode = await session.getReturnCode();
 
-    if (returnCode?.isValueSuccess() ?? false) {
-      print('getCachedAudio: Audio extracted: ${audioFile.path}');
+    // 5. Extract the audio
+    Future<bool> runFfmpeg(List<String> args) async {
+      final session = await FFmpegKit.executeWithArguments(args);
+      final rc = await session.getReturnCode();
+      if (rc?.isValueSuccess() ?? false) return true;
+      debugPrint('FFmpeg failed (rc: $rc):\n${await session.getAllLogsAsString()}');
+      return false;
+    }
 
-      // Delete the video and will keep the audio only
-      if (await videoFile.exists()) {
-        await videoFile.delete();
-        print('getCachedAudio: Temporary video deleted.');
-      }
-      return audioFile;
-      }
+    // First try a straight copy (fast, no quality loss, works when the audio is MP3)
+    var ok = await runFfmpeg([
+      '-y', '-i', videoFile.path, '-vn', '-c:a', 'copy', audioFile.path,
+    ]);
+
+    // Fall back to re-encoding if the copy fails
+    if (!ok) {
+      if (await audioFile.exists()) await audioFile.delete();
+      ok = await runFfmpeg([
+        '-y', '-i', videoFile.path, '-vn',
+        '-c:a', 'libmp3lame', '-q:a', '4', audioFile.path,
+      ]);
+    }
+
+    if (!ok) throw Exception('FFmpeg failed to extract audio');
+
+    debugPrint('getCachedAudio: Audio extracted: ${audioFile.path}');
+    return audioFile;
+  } catch (e) {
     if (await audioFile.exists()) await audioFile.delete();
-    throw Exception('getCachedAudio: FFmpeg failed to extract audio');
+    rethrow;
+  } finally {
+    // Always remove the temporary video files, success or failure
+    if (await videoFile.exists()) await videoFile.delete();
+    if (await partFile.exists()) await partFile.delete();
+  }
 }
 
 Future<void> _initializeAudio() async{
+  if(!await hasNetwork()){
+    if(!mounted) return;
+    setState(() {
+      audioInitializationError="You are not connected to the internet. Please turn on mobile data or WiFi";
+    });
+    return;
+  }
     for(int i=0; i<widget.selectedVideos.length;i++){
       final videoCode=widget.selectedVideos[i]['url'];
       final videoPlay2WatchUrl=Uri.parse('https://engine01.fuzikapp.com/play2_watch?p=$videoCode');
       try{
-        final response= await http.get(videoPlay2WatchUrl);
+        final response= await http.get(videoPlay2WatchUrl).timeout(Duration(minutes: 1));
         final data= jsonDecode(response.body);
         
         final videoLocation=data[0]['video_location_120'];
-
+        const prefix = 'https://media05.fuzikapp.com/stream/video_stream.php?code=';
+        final videoCodeFromPlay2Watch = data[0]['video_location'].replaceFirst(prefix, '');
+        final dimension=data[0]['dimension'];
+        videoDimensions.add(dimension);
+        videoLocations.add(videoCodeFromPlay2Watch);
         //Get Audio File (Extracted audio)
         final audioFile = await getCachedAudio(
         videoCode,
         videoLocation,
-      );
+      ).timeout(Duration(minutes: 4));
       print('_initializeAudio: VIDEO $i AUDIO: ${audioFile.path}');
         try{
           await players[i].setFilePath(audioFile.path,);
@@ -152,11 +220,20 @@ Future<void> _initializeAudio() async{
         }catch(e){
           debugPrint('_initializeAudio: Failed to load audio $i : $e');
         }
-      }catch (e, stackTrace) {
-        
+      }on TimeoutException{
+        setState(() {
+          audioInitializationError="Sorry, the connection is too slow.";
+        });
+      }
+      catch (e, stackTrace) {
+        if(!mounted) return;
+        setState(() {
+          audioInitializationError="Sorry,there is an error while initializing the audio. Error: $e";
+        });
         print('_initializeAudioFunction: INITIALIZATION ERROR PLAYER $i');
         print(e);
         print(stackTrace);
+        return;
       }
     }
   }
@@ -241,7 +318,6 @@ Future<void> startOverAllTracks() async {
   _syncMasterIcon(); // now false, since nothing is playing
 }
 
-
 Future<void> generateWaveform(
   int index,
   File audioFile,
@@ -279,6 +355,138 @@ Future<void> generateWaveform(
     print(e);
     print(stackTrace);
   }
+}
+
+int get countArtistVideo=>widget.selectedVideos.where((v)=>v['artist']?.toString().toLowerCase()=="yes").length;
+bool get containArtist=> countArtistVideo>0;
+
+Future<bool> showArtistVideoDialog(BuildContext context) async {
+  bool agreed = false;
+
+  final result = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false, // tapping outside doesn't close it
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1C1C1C),
+            title: const Text(
+              'Collaboration with Artist',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Text(
+                        "You are using artist video, you will be redirect to payment page.\nNumber of artist video used: $countArtistVideo", 
+                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                    ),
+                  ),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    activeColor: const Color(0xFFFFD600),
+                    checkColor: Colors.black,
+                    value: agreed,
+                    onChanged: (v) => setDialogState(() => agreed = v ?? false),
+                    title: const Text(
+                      'I hereby consent that the purchases and coins spent are not refundable.',
+                      style: TextStyle(color: Colors.white, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+              ),
+              ElevatedButton(
+                // null disables the button until the box is ticked
+                onPressed: agreed ? () => Navigator.pop(context, true) : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFD600),
+                  foregroundColor: Colors.black,
+                ),
+                child: const Text('Accept'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+
+  return result ?? false;
+}
+
+Future<bool> showSendToQueueChargeDialog(BuildContext context) async {
+  final result = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) {
+      return AlertDialog(
+        backgroundColor: const Color(0xFF1C1C1C),
+        title: const Text(
+          'Send to Queue',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Sending this collaboration to the queue will deduct ${WalletApi.collaborationQueueFee} FZ Tokens from your wallet.',
+          style: const TextStyle(color: Colors.white70, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFFD600),
+              foregroundColor: Colors.black,
+            ),
+            child: const Text('Confirm'),
+          ),
+        ],
+      );
+    },
+  );
+
+  return result ?? false;
+}
+
+Future<bool> _chargeCollaborationQueueFee(BuildContext context) async {
+  showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => const Center(
+      child: CircularProgressIndicator(color: Color(0xFFFFD600)),
+    ),
+  );
+
+  final charge = await WalletApi().chargeCollaborationQueueFee();
+
+  if (!context.mounted) return false;
+  Navigator.pop(context);
+
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    content: Text(
+      charge.success
+          ? 'Sent to queue. ${WalletApi.collaborationQueueFee} FZ Tokens deducted.'
+          : charge.error ?? 'Could not complete the charge.',
+    ),
+  ));
+  return charge.success;
 }
 
 @override
@@ -320,8 +528,7 @@ void dispose() {
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
 
-    final isTablet =
-        mediaQuery.size.shortestSide >= 600;
+    final isTablet = mediaQuery.size.shortestSide >= 600;
 
     final isPhonePortrait =
         !isTablet &&
@@ -394,19 +601,56 @@ void dispose() {
         ),
       );
     }
-
+    double screenWidth = MediaQuery.of(context).size.shortestSide;
+    bool isMobile = screenWidth < 600;
     // if Tablet or phone ia landscape, keep the existing Adjust Timeline UI(max's ipad).
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.black,
         elevation: 0,
-        leading: const BackButton(color: Colors.yellow),
-        title: const Text('Adjust Timeline', style: TextStyle(color: Colors.white)),
+        title: Row(
+          children: [
+            Image.asset('assets/images/FuzikLogo.png', width: 35, height: 35,),
+            SizedBox(width: 10,),
+            Text(
+              isMobile ? 'FZ' : 'FUZIK',
+              style: const TextStyle(
+                color: Colors.yellow,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 2,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          ValueListenableBuilder<WalletSummary?>(
+            valueListenable: walletSummaryNotifier,
+            builder: (context, summary, _) {
+              final pr = summary?.paidBalance;
+              final fz = summary?.freeBalance;
+              return Row(
+                children: [
+                  _buildStatusBadge(
+                    'PR ${pr ?? '—'}/∞',
+                    const Color(0xFF8AB4F8),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildStatusBadge(
+                    'FZ ${fz ?? '—'}/200',
+                    const Color(0xFFFFD600),
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
+        child:  SingleChildScrollView(
+          child: audioInitializationError.isEmpty? Column(
             children: [   
             const Divider(color: Colors.white24, thickness: 1),
             SizedBox(height: isTablet ? 20 : 15,),
@@ -493,8 +737,6 @@ void dispose() {
                            _alignmentBar(isTablet),
                          ]
                        ),
-                    
-
                     //Slider for timeline scroll
                     Padding(
                       padding: EdgeInsets.only(left: _scrollbarLeft(isTablet), right: _listPadding),
@@ -527,10 +769,15 @@ void dispose() {
                       alignment: Alignment.center,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.music_video,size: 45,),
-                          const SizedBox(height: 20,),
-                          const Text('Preview will be shown here', style: TextStyle(color: Colors.white54)),
+                        children: [       
+                          isPreviewReady? 
+                            SizedBox(
+                              width: 300,
+                              height: 200,
+                              child: WebVideoPlayer(videoUrl:previewVideoUrl ),
+                            )
+                            //HttpsVideoPlayer(isPreviewVideo: true,previewVideoUrl: previewVideoUrl,)
+                           :Text(previewGeneratingError, style: TextStyle(color: Colors.white54)),
                         ],
                       ),
                     ),
@@ -549,17 +796,68 @@ void dispose() {
                                 spreadRadius: 2
                               )],
                             ),
-                            child: ElevatedButton(
-                              onPressed: () {},
+                           child: ElevatedButton(
+                              onPressed: isPreviewLoading
+                                  ? null
+                                  : () async {
+                                      setState(() {
+                                        isPreviewLoading = true;
+                                        previewGeneratingError = 'Loading';
+                                      });
+
+                                      try {
+                                        final resultUrl = await generatePreview(
+                                          layoutName: widget.layoutName,
+                                          clip1: videoDimensions[0],
+                                          clip2: videoDimensions[1],
+                                          clipsNum: '${widget.selectedVideos.length}',
+                                          video01File: videoLocations[0],
+                                          video02File: videoLocations[1],
+                                          bar01: audioDelays[0],
+                                          bar02: audioDelays[1],
+                                          audio01: players[0].volume,
+                                          audio02: players[1].volume,
+                                        );
+
+                                        print('Preview url: $resultUrl');
+
+                                        if (!mounted) return;
+
+                                        setState(() {
+                                          isPreviewReady = true;
+                                          previewVideoUrl = resultUrl;
+                                        });
+                                      } catch (e) {
+                                        if (!mounted) return;
+
+                                        setState(() {
+                                          isPreviewReady = false;
+                                          previewGeneratingError =
+                                              'Preview Generating Error: $e';
+                                        });
+                                      } finally {
+                                        if (mounted) {
+                                          setState(() {
+                                            isPreviewLoading = false;
+                                          });
+                                        }
+                                      }
+                                    },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.yellow,
                                 foregroundColor: Colors.black,
+                                disabledBackgroundColor: const Color.fromARGB(255, 59, 59, 59),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15)
+                                  borderRadius: BorderRadius.circular(15),
                                 ),
-                                textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                                textStyle: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                              child: Text('Generate 20s Preview',style: TextStyle(fontSize: isTablet?17:12),),
+                              child: Text(
+                                isPreviewLoading ? 'Generating Preview...' : 'Generate 20s Preview',
+                                style: TextStyle(fontSize: isTablet ? 17 : 9),
+                              ),
                             ),
                           ),
                         ),
@@ -579,7 +877,62 @@ void dispose() {
                           )],
                         ),
                         child: ElevatedButton(
-                          onPressed: () {},
+                          onPressed: () async{
+                            if(containArtist){
+                              final isAccepted=await showArtistVideoDialog(context);
+                              if(!isAccepted||!context.mounted) return;
+                            }
+                              final isConfirmed=await showSendToQueueChargeDialog(context);
+                              if(!isConfirmed||!context.mounted) return;
+                              
+                                  final tempBar01 = (audioDelays[0].abs() * 1000).round();
+                                  final tempBar02 = (audioDelays[1].abs() * 1000).round();
+                                  final tempBar03 =widget.selectedVideos.length>2? (audioDelays[2].abs()*1000).round():0;
+                                  final tempBar04 =widget.selectedVideos.length>3? (audioDelays[3].abs()*1000).round():0;
+
+                                  final max0102=math.max(tempBar01, tempBar02);
+                                  final max0304=math.max(tempBar03, tempBar04);
+                                  final barMax = math.max(max0102, max0304);
+
+                                  final bar01 = barMax - tempBar01;
+                                  final bar02 = barMax - tempBar02;
+                                  final bar03 = barMax - tempBar02;
+                                  final bar04 = barMax - tempBar02;
+                                 
+                                  try {
+                                    final result = await submitBatch2(
+                                      email: email, 
+                                      layoutCode: widget.layoutName,
+                                      clipsNum: widget.selectedVideos.length,
+
+                                      code01: widget.selectedVideos[0]['url'],
+                                      code02: widget.selectedVideos[1]['url'],
+                                      code03:widget.selectedVideos.length>2?widget.selectedVideos[2]['url']:"-1",
+                                      code04:widget.selectedVideos.length>3?widget.selectedVideos[3]['url']:"-1",
+
+                                      bar01: bar01,
+                                      bar02: bar02,
+                                      bar03:widget.selectedVideos.length>2?bar03:-1,
+                                      bar04:widget.selectedVideos.length>3?bar04:-1,
+
+                                      audio01: volumes[0],
+                                      audio02: volumes[1],
+                                      audio03: widget.selectedVideos.length>2?volumes[2]:-1,
+                                      audio04: widget.selectedVideos.length>3?volumes[3]:-1,
+
+                                      clip01: videoDimensions[0],
+                                      clip02: videoDimensions[1],
+                                      clip03: widget.selectedVideos.length>2?videoDimensions[2]:'-1',
+                                      clip04: widget.selectedVideos.length>3?videoDimensions[3]:'-1',
+                                    );
+
+                                    print('Batch submitted: $result');
+                                  } catch (e) {
+                                    print('Submit failed: $e');
+                                  }
+                                  if(!context.mounted)return;
+                                  await _chargeCollaborationQueueFee(context);
+                                },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.yellow,
                             foregroundColor: Colors.black,
@@ -598,12 +951,160 @@ void dispose() {
                 ),
               ),
             ],
+          ) 
+          : Container(
+            alignment: Alignment.center,
+            padding: EdgeInsets.only(top: 40),
+            child: Column(
+              spacing: 10,
+                children: [
+                  Text(audioInitializationError, style: TextStyle(fontSize: 15),),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      foregroundColor: Colors.black,
+                      backgroundColor: Colors.yellow
+                    ),
+                    onPressed: (){
+                    Navigator.pop(context);
+                  }, 
+                  child: Text("Back"))
+                ],
+              ),
           ),
         ),
       ),
     );
   }
 
+Future<Map<String, dynamic>> submitBatch2({
+  required String email,
+  required String layoutCode,
+  required int clipsNum,
+  required String code01,
+  required String code02,
+  required int bar01,
+  required int bar02,
+  required double audio01,
+  required double audio02,
+  String clip01 = 'L',
+  String clip02 = 'L',
+  String code03 = '-1',
+  String code04 = '-1',
+  String clip03 = '-1',
+  String clip04 = '-1',
+  int bar03 = -1,
+  int bar04 = -1,
+  double audio03 = -1,
+  double audio04 = -1,
+}) async {
+  final uri = Uri.https(
+    'engine01.fuzikapp.com',
+    '/submit_batch2',
+    {
+      'email': email,
+      'layout_code': layoutCode,
+      'clips_num': clipsNum.toString(),
+
+      'clip1': clip01,
+      'clip2': clip02,
+      'clip3': clip03,
+      'clip4': clip04,
+
+      'code01': code01,
+      'code02': code02,
+      'code03': code03,
+      'code04': code04,
+
+      'bar01': bar01.toString(),
+      'bar02': bar02.toString(),
+      'bar03': bar03.toString(),
+      'bar04': bar04.toString(),
+
+      'audio01': audio01.toString(),
+      'audio02': audio02.toString(),
+      'audio03': audio03.toString(),
+      'audio04': audio04.toString(),
+    },
+  );
+
+  final response = await http.get(uri);
+
+  print('Submit URL: $uri');
+  print('Status code: ${response.statusCode}');
+  print('Response: ${response.body}');
+
+  if (response.statusCode != 200) {
+    throw Exception(
+      'Failed to submit batch: HTTP ${response.statusCode}',
+    );
+  }
+
+  final result = jsonDecode(response.body) as Map<String, dynamic>;
+
+  if (result['result'] != 'Success') {
+    throw Exception('Backend failed to submit the batch.');
+  }
+
+  return result;
+}
+Future<String> generatePreview({
+  required String layoutName,
+  required String clip1,
+  required String clip2,
+  required String clipsNum,
+  required String video01File,
+  required String video02File,
+  required double bar01,
+  required double bar02,
+  required double audio01,
+  required double audio02,
+
+}) async {
+  final tempBar01 = (bar01.abs() * 1000).round();
+  final tempBar02 = (bar02.abs() * 1000).round();
+
+  final barMax = math.max(tempBar01, tempBar02);
+
+   bar01 = tempBar01.toDouble();
+   bar02 = tempBar02.toDouble();
+   final hasAudibleTrack = volumes[0] > 0 || volumes[1] > 0;
+  //final startTime = hasAudibleTrack ? barMax /10.0 : 0.0;
+  final startTime=0.0;
+  final uri = Uri.https(
+    'media05.fuzikapp.com',
+    '/ajax_preview2.php',
+    {
+      'layout_name': layoutName,
+      'clip1': clip1,
+      'clip2': clip2,
+      'clips_num': clipsNum,
+      'video01_file': video01File,
+      'video02_file': video02File,
+      'bar01': bar01.toStringAsFixed(0),
+      'bar02': bar02.toStringAsFixed(0),
+      'audio01': audio01.toString(),
+      'audio02': audio02.toString(),
+      'start_time': startTime.round().toString()
+    },
+  );
+
+  final response = await http.get(uri);
+
+  if (response.statusCode != 200) {
+    throw Exception(
+      'Preview generation failed: HTTP ${response.statusCode}',
+    );
+  }
+
+  final result = response.body.trim();
+
+  if (result.isEmpty) {
+    throw Exception('The server returned an empty preview result.');
+  }
+
+  // The web version treats the response as a path or filename.
+  return 'https://media05.fuzikapp.com/$result';
+}
 //Tracks
 Widget _buildTrackTimeline(int index, {required bool isTablet}) {
     double secondsDelay = audioDelays[index];
@@ -970,6 +1471,15 @@ Widget _alignmentBar(bool isTablet) {
     ),
   );
 }
+  Widget _buildStatusBadge(String text, Color color) {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(20)),
+        child: Text(text, style: const TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
   //Waves
   Widget BarWaves(
       int index, {

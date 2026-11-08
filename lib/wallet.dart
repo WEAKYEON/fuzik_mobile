@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 
 import 'paysolution.dart';
@@ -15,21 +18,47 @@ class _WalletState extends State<Wallet> {
 
   final WalletApi _api = WalletApi();
   late Future<List<CoinPack>> _future;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  bool _wasOffline = false;
+  int? _nextFreeCoinSeconds;
+  Timer? _countdownTimer;
 
   @override
   void initState() {
     super.initState();
     _future = _load();
+    _connectivitySubscription =
+        Connectivity().onConnectivityChanged.listen(_onConnectivityChanged);
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_nextFreeCoinSeconds != null && _nextFreeCoinSeconds! > 0) {
+        setState(() => _nextFreeCoinSeconds = _nextFreeCoinSeconds! - 1);
+      }
+    });
+  }
+
+  void _onConnectivityChanged(List<ConnectivityResult> results) {
+    final isOffline = results.every((r) => r == ConnectivityResult.none);
+    if (_wasOffline && !isOffline) _refresh();
+    _wasOffline = isOffline;
   }
 
   @override
   void dispose() {
+    _connectivitySubscription?.cancel();
+    _countdownTimer?.cancel();
     _api.dispose();
     super.dispose();
   }
 
   Future<List<CoinPack>> _load() async {
-    final results = await Future.wait([_api.fetchSummary(), _api.fetchPacks()]);
+    final results = await Future.wait([
+      _api.fetchSummary(),
+      _api.fetchPacks(),
+      _api.triggerGiveAway(),
+    ]);
+    if (mounted) {
+      setState(() => _nextFreeCoinSeconds = results[2] as int?);
+    }
     return results[1] as List<CoinPack>;
   }
 
@@ -117,6 +146,14 @@ class _WalletState extends State<Wallet> {
     );
   }
 
+  String _nextFreeCoinDisplay() {
+    final seconds = _nextFreeCoinSeconds;
+    if (seconds == null) return '—';
+    final minutes = seconds ~/ 60;
+    final secs = seconds % 60;
+    return '$minutes:${secs.toString().padLeft(2, '0')}';
+  }
+
   Widget _buildBalanceSection() {
     return ValueListenableBuilder<WalletSummary?>(
       valueListenable: walletSummaryNotifier,
@@ -133,25 +170,25 @@ class _WalletState extends State<Wallet> {
           children: [
             Expanded(
               child: _buildBalanceCard(
-                badge: 'FZ',
+                badge: 'PR',
                 badgeColor: Colors.yellow,
                 badgeTextColor: Colors.black,
-                label: 'Free',
-                amount: freeAmount,
-                footer: 'Next coin in —',
-                footerColor: Colors.yellow,
+                label: 'Paid',
+                amount: paidAmount,
+                footer: 'See packs ↓',
+                footerColor: const Color(0xFF60A5FA),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _buildBalanceCard(
-                badge: 'PR',
-                badgeColor: const Color(0xFF1E3A8A),
-                badgeTextColor: Colors.white,
-                label: 'Paid',
-                amount: paidAmount,
-                footer: 'See packs ↓',
-                footerColor: const Color(0xFF60A5FA),
+                badge: 'FZ',
+                badgeColor: const Color(0xFF8AB4F8),
+                badgeTextColor: Colors.black,
+                label: 'Free',
+                amount: freeAmount,
+                footer: 'Next coin in ${_nextFreeCoinDisplay()}',
+                footerColor: Colors.yellow,
               ),
             ),
           ],
@@ -251,9 +288,19 @@ class _WalletState extends State<Wallet> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  pack.coinsLabel,
-                  style: const TextStyle(color: Colors.white, fontSize: 15),
+                RichText(
+                  text: TextSpan(
+                    style: const TextStyle(color: Colors.white, fontSize: 15),
+                    children: [
+                      TextSpan(text: '${pack.baseCoins}'),
+                      if (pack.bonusCoins > 0)
+                        TextSpan(
+                          text: ' + ${pack.bonusCoins}',
+                          style: const TextStyle(color: Color(0xFF4ADE80)),
+                        ),
+                      const TextSpan(text: ' Coins'),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -279,6 +326,11 @@ class _WalletState extends State<Wallet> {
                   ],
                 ),
               ),
+              if (pack.priceUsd != null)
+                Text(
+                  '\$${pack.priceUsd} USD',
+                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                ),
               const SizedBox(height: 10),
               ElevatedButton(
                 onPressed: onBuy,
