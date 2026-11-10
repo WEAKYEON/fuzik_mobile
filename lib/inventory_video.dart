@@ -890,10 +890,30 @@ class _InventoryVideoScreenState extends State<InventoryVideoScreen> {
                 color:Colors.black,
                 icon: const Icon(Icons.download),
                 onPressed: () async{
-                  final isConfirmed = await showCoinUsageConfirmationForVideoDownload();
-                  if(isConfirmed){
-                    //coin deduction logic here();
-                    downloadVideo(videoLink, widget.videoUrl);
+                  try{
+                    final checkDownloadAccess= await http.get(Uri.parse("$baseUrl/jam_download_access?email=${Supabase.instance.client.auth.currentUser?.email}&jam_id=${widget.videoUrl}"),headers:{"X-Jam-Download-Key":""});
+                    if(checkDownloadAccess.statusCode!=200){
+                      throw Exception("Failed to check download access");
+                    }
+                    final data=jsonDecode(checkDownloadAccess.body);
+                    final bool hasAccess=data[0]['active']=='true';
+                    if(hasAccess){
+                      downloadVideo(videoLink, widget.videoUrl);
+                      return;
+                    }
+                    final isConfirmed = await showCoinUsageConfirmationForVideoDownload();
+                    if(isConfirmed){
+                      //coin deduction logic here();
+                      final postDownloadAccess= await http.post(Uri.parse("$baseUrl/jam_download_access?email=${Supabase.instance.client.auth.currentUser?.email}&jam_id=${widget.videoUrl}"),headers:{"X-Jam-Download-Key":""});
+                      downloadVideo(videoLink, widget.videoUrl);
+                    }
+                  }catch(error){
+                    if(!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error checking download access: $error'),
+                      ),
+                    );
                   }
                 },
               ),
