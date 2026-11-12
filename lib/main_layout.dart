@@ -140,21 +140,29 @@ class _MainLayoutState extends State<MainLayout> {
               final fz = summary?.freeBalance;
               return Row(
                 children: [
-                  GestureDetector(
-                    onTap: _goToWallet,
-                    child: _buildStatusBadge(
-                      'PR ${pr ?? '—'}/∞',
-                      const Color(0xFFFFD600),
+                Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _goToWallet,
+                      borderRadius: BorderRadius.circular(20),
+                      child: _buildStatusBadge(
+                        'PR ${pr ?? '—'}/∞',
+                        const Color(0xFFFFD600),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: _goToWallet,
-                    child: _buildStatusBadge(
-                      'FZ ${fz ?? '—'}/200',
-                      const Color(0xFF8AB4F8),
+                ),
+                const SizedBox(width: 8),
+                Material(
+                    color: Colors.transparent,
+                    child : InkWell(
+                      onTap: _goToWallet,
+                      borderRadius: BorderRadius.circular(20),
+                      child: _buildStatusBadge(
+                        'FZ ${fz ?? '—'}/200',
+                        const Color(0xFF8AB4F8),
+                      ),
                     ),
-                  ),
+                ),
                 ],
               );
             },
@@ -332,13 +340,13 @@ class _MainLayoutState extends State<MainLayout> {
           child: Row(
             children: [
               Icon(
-                Icons.settings,
+                Icons.key_outlined,
                 color: Colors.white,
                 size: 18,
               ),
               SizedBox(width: 8),
               Text(
-                'Settings',
+                'Change Password',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 14,

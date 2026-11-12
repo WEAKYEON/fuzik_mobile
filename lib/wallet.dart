@@ -91,7 +91,11 @@ class _WalletState extends State<Wallet> {
           child: FutureBuilder<List<CoinPack>>(
             future: _future,
             builder: (context, snapshot) {
-              final packs = snapshot.data ?? WalletApi.defaultPacks;
+              //final packs = snapshot.data ?? WalletApi.defaultPacks;
+
+              final packs = List<CoinPack>.from(
+              snapshot.data ?? WalletApi.defaultPacks,
+              )..sort((a, b) => a.price.compareTo(b.price));
 
               return SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),

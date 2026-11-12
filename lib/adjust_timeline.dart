@@ -772,8 +772,8 @@ void dispose() {
                         children: [       
                           isPreviewReady? 
                             SizedBox(
-                              width: 300,
-                              height: 200,
+                              width: isTablet ? 300 : 288,
+                              height: isTablet ? 200 : 163,
                               child: WebVideoPlayer(videoUrl:previewVideoUrl ),
                             )
                             //HttpsVideoPlayer(isPreviewVideo: true,previewVideoUrl: previewVideoUrl,)
@@ -856,7 +856,7 @@ void dispose() {
                               ),
                               child: Text(
                                 isPreviewLoading ? 'Generating Preview...' : 'Generate 20s Preview',
-                                style: TextStyle(fontSize: isTablet ? 17 : 9),
+                                style: TextStyle(fontSize: isTablet ? 17 : 12),
                               ),
                             ),
                           ),
