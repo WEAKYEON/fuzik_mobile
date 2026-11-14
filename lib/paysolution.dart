@@ -21,11 +21,13 @@ class _PaySolutionState extends State<PaySolution> {
   String? _referenceNumber;
   bool _loadingRefno = true;
   bool _submitting = false;
+  double? _usdRate;
 
   @override
   void initState() {
     super.initState();
     _loadRefno();
+    _loadUsdRate();
   }
 
   Future<void> _loadRefno() async {
@@ -35,6 +37,12 @@ class _PaySolutionState extends State<PaySolution> {
       _referenceNumber = refno;
       _loadingRefno = false;
     });
+  }
+
+  Future<void> _loadUsdRate() async {
+    final rate = await WalletApi().fetchUsdRate();
+    if (!mounted) return;
+    setState(() => _usdRate = rate);
   }
 
   Future<void> _submitPayment() async {
@@ -125,13 +133,7 @@ class _PaySolutionState extends State<PaySolution> {
                   ? '${widget.pack.baseCoins} + ${widget.pack.bonusCoins} Coins'
                   : '${widget.pack.baseCoins} Coins'),
               const Divider(color: _borderColor, height: 1),
-              _buildRow(
-                'Amount',
-                widget.pack.priceUsd != null
-                    ? '฿${widget.pack.price} THB (\$${widget.pack.priceUsd} USD)'
-                    : '฿${widget.pack.price} THB',
-                emphasize: true,
-              ),
+              _buildRow('Amount', null, valueWidget: _buildAmountValue()),
             ],
           ),
         ),
@@ -171,11 +173,16 @@ class _PaySolutionState extends State<PaySolution> {
     );
   }
 
-  Widget _buildRow(String label, String value, {bool emphasize = false}) {
+  Widget _buildRow(
+    String label,
+    String? value, {
+    bool emphasize = false,
+    Widget? valueWidget,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
@@ -185,14 +192,50 @@ class _PaySolutionState extends State<PaySolution> {
               fontWeight: emphasize ? FontWeight.bold : FontWeight.normal,
             ),
           ),
-          Text(
-            value,
-            style: TextStyle(
-              color: emphasize ? Colors.yellow : Colors.white,
-              fontSize: emphasize ? 18 : 15,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: valueWidget ??
+                  Text(
+                    value ?? '',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: emphasize ? Colors.yellow : Colors.white,
+                      fontSize: emphasize ? 18 : 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAmountValue() {
+    final estimate = usdEstimate(widget.pack, _usdRate);
+    return RichText(
+      textAlign: TextAlign.right,
+      text: TextSpan(
+        children: [
+          TextSpan(
+            text: '฿${widget.pack.price} THB',
+            style: const TextStyle(
+              color: Colors.yellow,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
+          if (estimate != null)
+            TextSpan(
+              text: ' (≈ \$$estimate USD, estimated)',
+              style: const TextStyle(
+                color: Colors.white54,
+                fontSize: 12,
+                fontWeight: FontWeight.normal,
+              ),
+            ),
         ],
       ),
     );

@@ -16,7 +16,6 @@ class CoinPack {
   final int baseCoins;
   final int bonusCoins;
   final int price;
-  final int? priceUsd;
   final bool featured;
 
   const CoinPack({
@@ -25,7 +24,6 @@ class CoinPack {
     required this.baseCoins,
     this.bonusCoins = 0,
     required this.price,
-    this.priceUsd,
     this.featured = false,
   });
 
@@ -36,12 +34,14 @@ class CoinPack {
       baseCoins: int.tryParse((json['baseCoins'] ?? 0).toString()) ?? 0,
       bonusCoins: int.tryParse((json['bonusCoins'] ?? 0).toString()) ?? 0,
       price: int.tryParse((json['price'] ?? 0).toString()) ?? 0,
-      priceUsd: json['priceUsd'] == null
-          ? null
-          : int.tryParse(json['priceUsd'].toString()),
       featured: json['featured'] == true,
     );
   }
+}
+
+String? usdEstimate(CoinPack pack, double? usdRate) {
+  if (usdRate == null) return null;
+  return (pack.price * usdRate).toStringAsFixed(2);
 }
 
 class WalletSummary {
@@ -62,6 +62,38 @@ class CollaborationQueueCharge {
   });
 }
 
+class FreeCoinGiveaway {
+  FreeCoinGiveaway._();
+
+  static final FreeCoinGiveaway instance = FreeCoinGiveaway._();
+
+  final ValueNotifier<int?> nextFreeCoinSeconds = ValueNotifier<int?>(null);
+  final WalletApi _api = WalletApi();
+
+  String? _activeEmail;
+  Timer? _timer;
+
+  void start(String email) {
+    if (email.isEmpty || _activeEmail == email) return;
+    _activeEmail = email;
+
+    _timer?.cancel();
+    unawaited(_trigger(email));
+
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final seconds = nextFreeCoinSeconds.value;
+      if (seconds == null || seconds <= 0) return;
+      nextFreeCoinSeconds.value = seconds - 1;
+      if (nextFreeCoinSeconds.value == 0) unawaited(_trigger(_activeEmail!));
+    });
+  }
+
+  Future<void> _trigger(String email) async {
+    nextFreeCoinSeconds.value = await _api.triggerGiveAway(email);
+    unawaited(_api.fetchSummary());
+  }
+}
+
 class WalletApi {
   WalletApi({http.Client? client}) : _client = client ?? http.Client();
 
@@ -75,31 +107,23 @@ class WalletApi {
   static const String _activitiesEmail = 'ohm@tetrasolution.com';
 
   static const List<CoinPack> defaultPacks = [
-    CoinPack(
-      code: 'presto',
-      name: 'Presto Pack',
-      baseCoins: 300,
-      price: 199,
-      priceUsd: 8,
-    ),
+    // Adagio is temporarily priced at test values (1 coin / 2 THB) until the real pack (50 coins / 59 THB) goes live
+    CoinPack(code: 'adagio', name: 'Adagio Pack', baseCoins: 1, price: 2),
+    CoinPack(code: 'andante', name: 'Andante Pack', baseCoins: 100, price: 79),
     CoinPack(
       code: 'allegro',
       name: 'Allegro Pack',
       baseCoins: 200,
       price: 99,
-      priceUsd: 4,
       featured: true,
     ),
-    CoinPack(
-      code: 'andante',
-      name: 'Andante Pack',
-      baseCoins: 100,
-      price: 79,
-      priceUsd: 3,
-    ),
-    // Adagio is temporarily priced at test values (1 coin / 2 THB) until the real pack (50 coins / 59 THB / 2 USD) goes live
-    CoinPack(code: 'adagio', name: 'Adagio Pack', baseCoins: 1, price: 2, priceUsd: 2),
+    CoinPack(code: 'presto', name: 'Presto Pack', baseCoins: 300, price: 199),
   ];
+
+  static double? _cachedUsdRate;
+  static DateTime? _cachedUsdRateAt;
+  static const Duration _usdRateCacheDuration = Duration(hours: 1);
+  static const double _fallbackUsdRate = 0.027;
 
   String get _engineUrl =>
       (dotenv.env['ENGINE_URL'] ?? 'https://engine01.fuzikapp.com')
@@ -150,11 +174,12 @@ class WalletApi {
     return summary;
   }
 
-  Future<int?> triggerGiveAway() async {
+  Future<int?> triggerGiveAway(String email) async {
+    if (email.isEmpty) return null;
     try {
-      final uri = Uri.parse(
-        '$_engineUrl/give_away',
-      ).replace(queryParameters: {'realm_id': _realmFree});
+      final uri = Uri.parse('$_engineUrl/give_away').replace(
+        queryParameters: {'realm_id': _realmFree, 'email_account': email},
+      );
       final res = await _client.get(uri).timeout(_timeout);
       if (res.statusCode != 200) return null;
       final body = json.decode(res.body);
@@ -222,6 +247,33 @@ class WalletApi {
     } catch (_) {
       return false;
     }
+  }
+
+  Future<double> fetchUsdRate() async {
+    final cachedAt = _cachedUsdRateAt;
+    if (_cachedUsdRate != null &&
+        cachedAt != null &&
+        DateTime.now().difference(cachedAt) < _usdRateCacheDuration) {
+      return _cachedUsdRate!;
+    }
+
+    try {
+      final uri = Uri.parse(
+        'https://api.frankfurter.dev/v1/latest',
+      ).replace(queryParameters: {'base': 'THB', 'symbols': 'USD'});
+      final res = await _client.get(uri).timeout(_timeout);
+      if (res.statusCode == 200) {
+        final body = json.decode(res.body);
+        final rates = body is Map ? body['rates'] : null;
+        final rate = rates is Map ? rates['USD'] : null;
+        if (rate is num && rate > 0) {
+          _cachedUsdRate = rate.toDouble();
+          _cachedUsdRateAt = DateTime.now();
+          return _cachedUsdRate!;
+        }
+      }
+    } catch (_) {}
+    return _cachedUsdRate ?? _fallbackUsdRate;
   }
 
   Future<List<CoinPack>> fetchPacks() async {

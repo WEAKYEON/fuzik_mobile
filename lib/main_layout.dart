@@ -40,10 +40,11 @@ class _MainLayoutState extends State<MainLayout> {
     if (user != null && user.email != null) {
       print(user);
       email=user.email!;
-      _displayName = user.email!.split('@')[0].isNotEmpty 
-          ? user.email!.split('@')[0] 
+      _displayName = user.email!.split('@')[0].isNotEmpty
+          ? user.email!.split('@')[0]
           : 'User';
 
+      FreeCoinGiveaway.instance.start(email);
       _loadProfile();
     }
   }

@@ -20,8 +20,8 @@ class _WalletState extends State<Wallet> {
   late Future<List<CoinPack>> _future;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _wasOffline = false;
-  int? _nextFreeCoinSeconds;
-  Timer? _countdownTimer;
+  final GlobalKey _packsSectionKey = GlobalKey();
+  double? _usdRate;
 
   @override
   void initState() {
@@ -29,11 +29,6 @@ class _WalletState extends State<Wallet> {
     _future = _load();
     _connectivitySubscription =
         Connectivity().onConnectivityChanged.listen(_onConnectivityChanged);
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (_nextFreeCoinSeconds != null && _nextFreeCoinSeconds! > 0) {
-        setState(() => _nextFreeCoinSeconds = _nextFreeCoinSeconds! - 1);
-      }
-    });
   }
 
   void _onConnectivityChanged(List<ConnectivityResult> results) {
@@ -45,7 +40,6 @@ class _WalletState extends State<Wallet> {
   @override
   void dispose() {
     _connectivitySubscription?.cancel();
-    _countdownTimer?.cancel();
     _api.dispose();
     super.dispose();
   }
@@ -54,10 +48,10 @@ class _WalletState extends State<Wallet> {
     final results = await Future.wait([
       _api.fetchSummary(),
       _api.fetchPacks(),
-      _api.triggerGiveAway(),
+      _api.fetchUsdRate(),
     ]);
     if (mounted) {
-      setState(() => _nextFreeCoinSeconds = results[2] as int?);
+      setState(() => _usdRate = results[2] as double?);
     }
     return results[1] as List<CoinPack>;
   }
@@ -68,6 +62,16 @@ class _WalletState extends State<Wallet> {
     try {
       await future;
     } catch (_) {}
+  }
+
+  void _scrollToPacks() {
+    final context = _packsSectionKey.currentContext;
+    if (context == null) return;
+    Scrollable.ensureVisible(
+      context,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
   }
 
   void _openPaySolution(CoinPack pack) {
@@ -117,9 +121,10 @@ class _WalletState extends State<Wallet> {
                     _buildBalanceSection(),
                     const SizedBox(height: 32),
 
-                    const Text(
+                    Text(
                       'Buy coins',
-                      style: TextStyle(
+                      key: _packsSectionKey,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
@@ -146,14 +151,6 @@ class _WalletState extends State<Wallet> {
     );
   }
 
-  String _nextFreeCoinDisplay() {
-    final seconds = _nextFreeCoinSeconds;
-    if (seconds == null) return '—';
-    final minutes = seconds ~/ 60;
-    final secs = seconds % 60;
-    return '$minutes:${secs.toString().padLeft(2, '0')}';
-  }
-
   Widget _buildBalanceSection() {
     return ValueListenableBuilder<WalletSummary?>(
       valueListenable: walletSummaryNotifier,
@@ -165,35 +162,54 @@ class _WalletState extends State<Wallet> {
             ? '${summary!.paidBalance}'
             : '—';
 
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: _buildBalanceCard(
-                badge: 'PR',
-                badgeColor: Colors.yellow,
-                badgeTextColor: Colors.black,
-                label: 'Paid',
-                amount: paidAmount,
-                footer: 'See packs ↓',
-                footerColor: const Color(0xFF60A5FA),
+        return IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _buildBalanceCard(
+                  badge: 'PR',
+                  badgeColor: Colors.yellow,
+                  badgeTextColor: Colors.black,
+                  label: 'Paid',
+                  amount: paidAmount,
+                  footer: _buildSeePacksButton(),
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildBalanceCard(
-                badge: 'FZ',
-                badgeColor: const Color(0xFF8AB4F8),
-                badgeTextColor: Colors.black,
-                label: 'Free',
-                amount: freeAmount,
-                footer: 'Next coin in ${_nextFreeCoinDisplay()}',
-                footerColor: Colors.yellow,
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildBalanceCard(
+                  badge: 'FZ',
+                  badgeColor: const Color(0xFF8AB4F8),
+                  badgeTextColor: Colors.black,
+                  label: 'Free',
+                  amount: freeAmount,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
+    );
+  }
+
+  Widget _buildSeePacksButton() {
+    return OutlinedButton(
+      onPressed: _scrollToPacks,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: const Color(0xFF60A5FA),
+        side: const BorderSide(color: Color(0xFF60A5FA)),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+      ),
+      child: const Text(
+        'See packs ↓',
+        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+      ),
     );
   }
 
@@ -203,8 +219,7 @@ class _WalletState extends State<Wallet> {
     required Color badgeTextColor,
     required String label,
     required String amount,
-    required String footer,
-    required Color footerColor,
+    Widget? footer,
   }) {
     return Container(
       width: double.infinity,
@@ -252,8 +267,10 @@ class _WalletState extends State<Wallet> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 6),
-          Text(footer, style: TextStyle(color: footerColor, fontSize: 14)),
+          if (footer != null) ...[
+            const SizedBox(height: 6),
+            footer,
+          ],
         ],
       ),
     );
@@ -326,10 +343,21 @@ class _WalletState extends State<Wallet> {
                   ],
                 ),
               ),
-              if (pack.priceUsd != null)
-                Text(
-                  '\$${pack.priceUsd} USD',
-                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+              if (usdEstimate(pack, _usdRate) != null)
+                RichText(
+                  text: TextSpan(
+                    style: const TextStyle(
+                      color: Colors.white54,
+                      fontSize: 12,
+                    ),
+                    children: [
+                      TextSpan(text: '≈ \$${usdEstimate(pack, _usdRate)} USD '),
+                      const TextSpan(
+                        text: '(estimated)',
+                        style: TextStyle(color: Colors.white38),
+                      ),
+                    ],
+                  ),
                 ),
               const SizedBox(height: 10),
               ElevatedButton(
