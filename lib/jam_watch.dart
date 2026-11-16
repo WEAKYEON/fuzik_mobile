@@ -10,6 +10,7 @@ import 'package:fuzik_mobile/services/fetch_videos.dart';
 import 'collaboration.dart';
 import 'httpsVideoPlayer.dart';
 import 'youtube_player.dart';
+import 'package:fuzik_mobile/services/download_button.dart';
 
 const _apiBase = 'https://engine01.fuzikapp.com';
 const _mediaBase = 'https://media05.fuzikapp.com';
@@ -337,7 +338,7 @@ class _JamWatchScreenState extends State<JamWatchScreen> {
               ),
 
               const SizedBox(height: 12),
-
+              DownloadButton(videoUrl: widget.videoUrl, videoLink: videoDetail.videoDetail.isNotEmpty ? "https://media05.fuzikapp.com/${videoDetail.videoDetail[0]['file_location'].toString()}" : ""),
               // DIVIDER
               Container(
                 height: 1,

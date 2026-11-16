@@ -818,11 +818,13 @@ void dispose() {
                                           audio01: players[0].volume,
                                           audio02: players[1].volume,
                                         );
-
+                                        
                                         print('Preview url: $resultUrl');
 
                                         if (!mounted) return;
-
+                                        if (resultUrl == null || resultUrl.isEmpty) {
+                                          throw Exception('Server returned an empty preview URL.');
+                                        }
                                         setState(() {
                                           isPreviewReady = true;
                                           previewVideoUrl = resultUrl;
@@ -1095,7 +1097,9 @@ Future<String> generatePreview({
       'Preview generation failed: HTTP ${response.statusCode}',
     );
   }
-
+  print('Status: ${response.statusCode}');
+  print('Headers: ${response.headers}');
+  print('Body: "${response.body}"');
   final result = response.body.trim();
 
   if (result.isEmpty) {

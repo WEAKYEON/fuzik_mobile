@@ -17,7 +17,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 String email='';
 class MainLayout extends StatefulWidget {
-  const MainLayout({super.key});
+  final bool goToWallet;
+  const MainLayout({super.key, this.goToWallet = false});
 
   @override
   State<MainLayout> createState() => _MainLayoutState();
@@ -45,6 +46,9 @@ class _MainLayoutState extends State<MainLayout> {
           : 'User';
 
       _loadProfile();
+      if(widget.goToWallet){
+        _selectedIndex=4;
+      }
     }
   }
 
