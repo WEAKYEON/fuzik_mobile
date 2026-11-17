@@ -1344,9 +1344,8 @@ class _InventoryContentState extends State<InventoryContent> {
                 ),
               );
 
-              if (changed == true) {
-                _loadInventory();
-              }
+              if (!mounted) return;
+              _loadInventory();
             },
             child: Container(
               clipBehavior: Clip.antiAlias,

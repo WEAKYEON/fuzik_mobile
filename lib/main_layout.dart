@@ -199,9 +199,14 @@ class _MainLayoutState extends State<MainLayout> {
         unselectedItemColor: Colors.white54,
         currentIndex: _selectedIndex,
         onTap: (index) {
+          final previousIndex = _selectedIndex;
+
           setState(() {
             _selectedIndex = index;
           });
+          if (index == 0 && previousIndex != 0) {
+            _dashboardKey.currentState?.refreshDashboardData();
+          }
 
           // if (index == 0) {
           //   _dashboardKey.currentState?.refreshDashboardData();
