@@ -147,7 +147,7 @@ class DashboardContentState extends State<DashboardContent> {
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 30),
       
             // ช่องค้นหา (Search)
             Center(
@@ -203,10 +203,12 @@ class DashboardContentState extends State<DashboardContent> {
                 ),
               ),
             ),
-            const SizedBox(height: 40),
+            SizedBox(height: isTablet ? 40 : 20),
             
             isSoloSelected?Text("Portrait", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)):Container(),
-            const SizedBox(height: 16),
+            SizedBox(
+              height: isTablet ? 16 : (isSoloSelected ? 16 : 0),
+            ),
       
             //Portrait Videos
             isSoloSelected?FutureBuilder<FetchVideos>(
@@ -307,7 +309,9 @@ class DashboardContentState extends State<DashboardContent> {
             }
             ):Container(),
 
-            SizedBox(height: 20),
+            SizedBox(
+              height: isTablet ? 20 : (isSoloSelected ? 20 : 0),
+            ),
 
             Text(isSoloSelected ? 'Landscape' : 'Jam', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
@@ -667,7 +671,14 @@ class DashboardContentState extends State<DashboardContent> {
             : FutureBuilder(future: getJamViews(videoUrl: videoUrl), 
                             builder: (context,snapeshot){
                                if(snapeshot.connectionState==ConnectionState.waiting){
-                                return CircularProgressIndicator(color:Colors.yellow);
+                                  return const SizedBox(
+                                    width: 12,
+                                    height: 12,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.yellow,
+                                      strokeWidth: 2,
+                                    ),
+                                  );
                                }
                                if(!snapeshot.hasData){
                                 return Text('0');
