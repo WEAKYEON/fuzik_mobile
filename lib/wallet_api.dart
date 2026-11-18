@@ -69,6 +69,8 @@ class WalletApi {
 
   static const Duration _timeout = Duration(seconds: 20);
   static const int freeCap = 200;
+  static const bool localDownloadTest = bool.fromEnvironment('JAM_DOWNLOAD_LOCAL_TEST');
+  static const String _downloadOrigin = String.fromEnvironment('JAM_DOWNLOAD_WEB_BASE_URL');
   static const int giveAwayIntervalSeconds = 479;
   static const int collaborationQueueFee = 120;
   static const String _depositEmail = 'omiesensei@gmail.com';
@@ -112,6 +114,29 @@ class WalletApi {
   String? get currentEmail => Supabase.instance.client.auth.currentUser?.email;
 
   Future<int?> _tokenBalance(String realmId, String email) async {
+    if (localDownloadTest && realmId == _realmFree) {
+      final origin = Uri.tryParse(_downloadOrigin);
+      if (origin == null || !['localhost', '127.0.0.1', '10.0.2.2'].contains(origin.host)) {
+        return null;
+      }
+      try {
+        var session = Supabase.instance.client.auth.currentSession;
+        if (session == null) return null;
+        if (session.isExpired) {
+          session = (await Supabase.instance.client.auth.refreshSession()).session;
+        }
+        if (session == null) return null;
+        final response = await _client.get(origin.resolve('/api/local_balance'), headers: {
+          'Authorization': 'Bearer ${session.accessToken}',
+        }).timeout(_timeout);
+        if (response.statusCode != 200) return null;
+        final data = jsonDecode(response.body);
+        return data is Map && data['localTest'] == true && data['balance'] is num
+            ? (data['balance'] as num).toInt() : null;
+      } catch (_) {
+        return null;
+      }
+    }
     final uri = Uri.parse('$_engineUrl/check_balance').replace(
       queryParameters: {
         'q': 'a',
@@ -151,6 +176,7 @@ class WalletApi {
   }
 
   Future<int?> triggerGiveAway() async {
+    if (localDownloadTest) return null;
     try {
       final uri = Uri.parse(
         '$_engineUrl/give_away',

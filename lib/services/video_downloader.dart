@@ -34,8 +34,8 @@ class DownloadResult {
 
 class VideoDownloader {
   VideoDownloader({Dio? dio})
-      : _dio = dio ??
-            Dio(BaseOptions(connectTimeout: const Duration(seconds: 30)));
+    : _dio =
+          dio ?? Dio(BaseOptions(connectTimeout: const Duration(seconds: 30)));
 
   static const String _referer = 'https://fuzikapp.com';
 
@@ -52,6 +52,7 @@ class VideoDownloader {
     required String url,
     required String fileName,
     String? album,
+    Map<String, String>? headers,
     void Function(double? progress)? onProgress,
   }) async {
     if (isDownloading) {
@@ -90,7 +91,8 @@ class VideoDownloader {
         partFile.path,
         cancelToken: cancelToken,
         options: Options(
-          headers: {'Referer': _referer},
+          headers: {'Referer': _referer, ...?headers},
+          followRedirects: false,
           // stops if no data arrives for this long
           receiveTimeout: const Duration(seconds: 60),
         ),
@@ -100,16 +102,18 @@ class VideoDownloader {
       );
 
       // 3. Make sure we really got a video, not an error page
-      final type =
-          (response.headers.value(Headers.contentTypeHeader) ?? '').toLowerCase();
+      final type = (response.headers.value(Headers.contentTypeHeader) ?? '')
+          .toLowerCase();
       final size = await partFile.length();
       if (size < 1024 || type.startsWith('text/') || type.contains('json')) {
         final bytes = <int>[];
         await for (final chunk in partFile.openRead(0, 200)) {
           bytes.addAll(chunk);
         }
-        debugPrint('Download is not a video ($type, $size bytes): '
-            '${String.fromCharCodes(bytes)}');
+        debugPrint(
+          'Download is not a video ($type, $size bytes): '
+          '${String.fromCharCodes(bytes)}',
+        );
         return const DownloadResult(
           DownloadStatus.failed,
           'The server did not return a valid video.',
@@ -126,7 +130,7 @@ class VideoDownloader {
       if (e.type == DioExceptionType.cancel) {
         return const DownloadResult(DownloadStatus.cancelled);
       }
-      debugPrint('Download error: $e');
+      debugPrint('Video download failed.');
       return DownloadResult(DownloadStatus.failed, _dioMessage(e));
     } on GalException catch (e) {
       return DownloadResult(
@@ -136,7 +140,7 @@ class VideoDownloader {
         e.type.message,
       );
     } catch (e) {
-      debugPrint('Download error: $e');
+      debugPrint('Video download failed.');
       return DownloadResult(
         DownloadStatus.failed,
         'Could not save the video: $e',
