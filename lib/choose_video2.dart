@@ -221,7 +221,68 @@ Widget buildLayoutPreview(String layoutName, List<dynamic> selectedVideos, int t
           );
         }
       );
-        
+      
+      case '3_03':
+        return LayoutBuilder(
+
+          builder: (context,constraint){
+            return Stack(
+              children: [
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  child: SizedBox(
+                    width: constraint.maxWidth/2,
+                    height: constraint.maxHeight/2,
+                    child: _slot(selectedVideos, 0),
+                  )
+                  ),
+                Positioned(
+                  top: constraint.maxHeight/2,
+                  left:0,
+                  child: SizedBox(
+                    width: constraint.maxWidth/2,
+                    height: constraint.maxHeight/2,
+                    child: _slot(selectedVideos, 1),
+                  )
+                  ),
+                Positioned(
+                  top:0,
+                  left:constraint.maxWidth/2,
+                  child: SizedBox(
+                    width: constraint.maxWidth/2,
+                    height: constraint.maxHeight/2,
+                    child: _slot(selectedVideos, 2),
+                  )
+                  ),
+                  Positioned(
+                  top: constraint.maxHeight/2,
+                  left:constraint.maxWidth/2,
+                  child: SizedBox(
+                    width: constraint.maxWidth/2,
+                    height: constraint.maxHeight/2,
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                           SizedBox(width:constraint.maxWidth/6,height: constraint.maxHeight/4 ,child:DecorativeWaveform()), 
+                           SizedBox(width:constraint.maxWidth/6,height: constraint.maxHeight/4 ,child:DecorativeWaveform()),
+                           SizedBox(width:constraint.maxWidth/6,height: constraint.maxHeight/4 ,child:DecorativeWaveform()),
+                          ],
+                        ),
+                        SizedBox(
+                          width: constraint.maxWidth/2,
+                          height: constraint.maxHeight/4,
+                          child:DecorativeWaveform(extraNumberOfAmplitudes: 40,)
+                        )
+                      ],
+                    ),
+                  )
+                  ),
+              ],
+            );
+          }
+          );
       case '3_02':
         return Stack(
           children:[
@@ -266,7 +327,33 @@ Widget buildLayoutPreview(String layoutName, List<dynamic> selectedVideos, int t
             ),)
           ]
         );
-        case '2_07':
+      case "2_08":
+        return LayoutBuilder(
+          builder:(context, constraints) {
+            return Row(
+              children: [
+                SizedBox(
+                  width: 3*constraints.maxWidth/10,
+                  height: constraints.maxHeight,
+                  child: _slot(selectedVideos, 0),
+                ),
+                SizedBox(
+                  width: 3*constraints.maxWidth/10,
+                  height: constraints.maxHeight,
+                  child: _slot(selectedVideos, 1),
+                ),
+                Column(
+                  children: [
+                    SizedBox(width: 4*constraints.maxWidth/10,height: constraints.maxHeight/3, child: DecorativeWaveform(extraNumberOfAmplitudes: 10,),),
+                    SizedBox(width: 4*constraints.maxWidth/10,height: constraints.maxHeight/3, child: DecorativeWaveform(extraNumberOfAmplitudes: 10,),),
+                    SizedBox(width: 4*constraints.maxWidth/10,height: constraints.maxHeight/3, child: DecorativeWaveform(extraNumberOfAmplitudes: 10,),),
+                  ],
+                )
+              ],
+            );
+          },
+        );
+      case '2_07':
         return Stack(
           children:[
             Positioned.fill(
@@ -296,15 +383,15 @@ Widget buildLayoutPreview(String layoutName, List<dynamic> selectedVideos, int t
                 Positioned(
                   left:constraints.maxWidth/3,
                   width: 2*constraints.maxWidth/3,
-                  height: 4*constraints.maxHeight/5,
+                  height: 2*constraints.maxHeight/3,
                   child: _slot(selectedVideos, 1)
                   ),
                 Positioned(
                   left:constraints.maxWidth/3,
-                  top:4*constraints.maxHeight/5,
+                  top:2*constraints.maxHeight/3,
                   child:DecorativeWaveform(
                     width: 2*constraints.maxWidth /3,
-                    height: constraints.maxHeight/5,
+                    height: constraints.maxHeight/3,
                     extraNumberOfAmplitudes: 60,
                   
                   ),
