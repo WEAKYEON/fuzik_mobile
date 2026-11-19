@@ -1,5 +1,6 @@
 import 'dart:async';
-
+import 'package:flutter/cupertino.dart';
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dashboard.dart';
@@ -183,7 +184,9 @@ class _MainLayoutState extends State<MainLayout> {
             DashboardContent(
               key: _dashboardKey,
             ),
-            UploadContent(isActive: _selectedIndex == 1),
+            UploadContent(isActive: _selectedIndex == 1, onUploadSuccess: (){setState(() {
+              _selectedIndex=2;
+            });},),
              InventoryContent(isActive: _selectedIndex == 2,
           ),
             const CollaborationContent(),
@@ -212,13 +215,21 @@ class _MainLayoutState extends State<MainLayout> {
           //   _dashboardKey.currentState?.refreshDashboardData();
           // }
         },
-        items: const [
+        items: Platform.isIOS? 
+        const[
+          BottomNavigationBarItem(icon: Icon(CupertinoIcons.uiwindow_split_2x1), label: 'Dashboard'),
+          BottomNavigationBarItem(icon: Icon(CupertinoIcons.cloud_upload), label: 'Upload'),
+          BottomNavigationBarItem(icon: Icon(CupertinoIcons.cube_box), label: 'Inventory'),
+          BottomNavigationBarItem(icon: Icon(CupertinoIcons.guitars), label: 'Collab'),
+          BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet_rounded), label: 'Wallet'),
+        ]
+        :const [
           BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
           BottomNavigationBarItem(icon: Icon(Icons.upload), label: 'Upload'),
           BottomNavigationBarItem(icon: Icon(Icons.grid_view), label: 'Inventory'),
           BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Collab'),
           BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet_rounded), label: 'Wallet'),
-        ],
+        ]
       ),
     );
   }
