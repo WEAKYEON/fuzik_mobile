@@ -337,7 +337,6 @@ class _JamWatchScreenState extends State<JamWatchScreen> {
               ),
 
               const SizedBox(height: 12),
-
               // DIVIDER
               Container(
                 height: 1,
