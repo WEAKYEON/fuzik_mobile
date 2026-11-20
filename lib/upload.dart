@@ -457,21 +457,20 @@ class _UploadContentState extends State<UploadContent> {
           disabledBackgroundColor: Colors.grey,
         ),
         child: _isUploading
-            ? const SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: Colors.black,
-          ),
-        )
-            : const Text(
-          'Save information',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+            ? Row(
+                children: [
+                Text("Uploading. Please do not leave the screen."),
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.black,
+                          ),
+                          ),
+                        ],
+            )
+            : const Text('Save Information', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold,),),
       ),
     ],
   );
